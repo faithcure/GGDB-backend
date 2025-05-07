@@ -2,24 +2,29 @@
 const mongoose = require("mongoose");
 
 const GameSchema = new mongoose.Schema({
-  title: String,
+  title: { type: String, required: true },
   originalTitle: String,
-  releaseDate: String,
+  releaseDate: String, // İsteğe bağlı: Date olarak da tutulabilir
   coverImage: String,
   trailerUrl: String,
   tags: [String],
-  director: String,
-  studio: String,
-  cast: [String],
-  soundtrack: String,
-  story: String,
-  engine: String,
-  franchise: String,
   genres: [String],
   platforms: [String],
+  studio: String,
+  developer: String,
+  publisher: String,
+  engine: String,
+  franchise: String,
+  director: String,
+  soundtrack: String,
+  story: String,
+  cast: [String],
+  contentWarnings: [String],
+  ageRatings: [String],
+  gallery: [String],
   languages: {
-    subtitles: [String],
     audio: [String],
+    subtitles: [String],
     interface: [String],
   },
   whereToBuy: [
@@ -28,10 +33,19 @@ const GameSchema = new mongoose.Schema({
       url: String,
     },
   ],
-  crew: [String],
-  contentWarnings: [String],
-  ageRatings: [String],
-  gallery: [String],
+  crew: [String], // daha detaylı bir yapı istenirse ileride ayrı bir schema olarak ayrılabilir
+  awards: [String],
+  metacriticScore: Number,
+  userRating: Number,
+  playtime: Number, // ortalama oynanma süresi (saat)
+  steamLink: String,
+  website: String,
+  price: Number,
+  // Opsiyonel: Dökümantasyon için ileride kullanılabilir
+  systemRequirements: {
+    minimum: String,
+    recommended: String,
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model("Game", GameSchema);
