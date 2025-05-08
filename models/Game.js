@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 const GameSchema = new mongoose.Schema({
   title: { type: String, required: true },
   originalTitle: String,
-  releaseDate: String, // İsteğe bağlı: Date olarak da tutulabilir
+  releaseDate: String,
   coverImage: String,
   trailerUrl: String,
   tags: [String],
@@ -16,6 +16,7 @@ const GameSchema = new mongoose.Schema({
   engine: String,
   franchise: String,
   director: String,
+  composer: String,
   soundtrack: String,
   story: String,
   cast: [String],
@@ -33,15 +34,18 @@ const GameSchema = new mongoose.Schema({
       url: String,
     },
   ],
-  crew: [String], // daha detaylı bir yapı istenirse ileride ayrı bir schema olarak ayrılabilir
+  crew: [String],
   awards: [String],
   metacriticScore: Number,
   userRating: Number,
-  playtime: Number, // ortalama oynanma süresi (saat)
+  playtime: Number,
   steamLink: String,
   website: String,
   price: Number,
-  // Opsiyonel: Dökümantasyon için ileride kullanılabilir
+  dlcs: [String],
+  inspiration: [String],
+  officialWebsite: String,
+  estimatedPlaytime: String,
   systemRequirements: {
     minimum: String,
     recommended: String,

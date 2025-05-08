@@ -1,3 +1,4 @@
+// controllers/gameController.js
 const Game = require("../models/Game");
 
 exports.getAllGames = async (req, res) => {
@@ -21,7 +22,24 @@ exports.getGameById = async (req, res) => {
 
 exports.createGame = async (req, res) => {
   try {
-    const newGame = new Game(req.body);
+    const gameData = {
+      ...req.body,
+      tags: req.body.tags || [],
+      genres: req.body.genres || [],
+      platforms: req.body.platforms || [],
+      cast: req.body.cast || [],
+      contentWarnings: req.body.contentWarnings || [],
+      ageRatings: req.body.ageRatings || [],
+      gallery: req.body.gallery || [],
+      dlcs: req.body.dlcs || [],
+      awards: req.body.awards || [],
+      inspiration: req.body.inspiration || [],
+      whereToBuy: req.body.whereToBuy || [],
+      languages: req.body.languages || { audio: [], subtitles: [], interface: [] },
+      systemRequirements: req.body.systemRequirements || { minimum: "", recommended: "" },
+    };
+
+    const newGame = new Game(gameData);
     await newGame.save();
     res.status(201).json(newGame);
   } catch (err) {
