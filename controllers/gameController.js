@@ -1,4 +1,3 @@
-// controllers/gameController.js
 const Game = require("../models/Game");
 
 exports.getAllGames = async (req, res) => {
@@ -34,7 +33,7 @@ exports.createGame = async (req, res) => {
       dlcs: req.body.dlcs || [],
       awards: req.body.awards || [],
       inspiration: req.body.inspiration || [],
-      whereToBuy: req.body.whereToBuy || [],
+      storeLinks: req.body.storeLinks || [], // ✅ EKLENDİ
       languages: req.body.languages || { audio: [], subtitles: [], interface: [] },
       systemRequirements: req.body.systemRequirements || { minimum: "", recommended: "" },
     };
@@ -49,7 +48,24 @@ exports.createGame = async (req, res) => {
 
 exports.updateGame = async (req, res) => {
   try {
-    const updatedGame = await Game.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const gameData = {
+      ...req.body,
+      tags: req.body.tags || [],
+      genres: req.body.genres || [],
+      platforms: req.body.platforms || [],
+      cast: req.body.cast || [],
+      contentWarnings: req.body.contentWarnings || [],
+      ageRatings: req.body.ageRatings || [],
+      gallery: req.body.gallery || [],
+      dlcs: req.body.dlcs || [],
+      awards: req.body.awards || [],
+      inspiration: req.body.inspiration || [],
+      storeLinks: req.body.storeLinks || [], // ✅ EKLENDİ
+      languages: req.body.languages || { audio: [], subtitles: [], interface: [] },
+      systemRequirements: req.body.systemRequirements || { minimum: "", recommended: "" },
+    };
+
+    const updatedGame = await Game.findByIdAndUpdate(req.params.id, gameData, { new: true });
     res.json(updatedGame);
   } catch (err) {
     res.status(400).json({ error: "Failed to update game" });
