@@ -28,9 +28,9 @@ const GameSchema = new mongoose.Schema({
     subtitles: [String],
     interface: [String],
   },
-  whereToBuy: [
+  storeLinks: [
     {
-      name: String,
+      platform: String,
       url: String,
     },
   ],
