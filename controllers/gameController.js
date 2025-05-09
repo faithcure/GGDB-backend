@@ -33,7 +33,7 @@ exports.createGame = async (req, res) => {
       dlcs: req.body.dlcs || [],
       awards: req.body.awards || [],
       inspiration: req.body.inspiration || [],
-      storeLinks: req.body.storeLinks || [], // ✅ EKLENDİ
+      storeLinks: req.body.storeLinks || [], 
       languages: req.body.languages || { audio: [], subtitles: [], interface: [] },
       systemRequirements: req.body.systemRequirements || { minimum: "", recommended: "" },
     };
@@ -60,7 +60,7 @@ exports.updateGame = async (req, res) => {
       dlcs: req.body.dlcs || [],
       awards: req.body.awards || [],
       inspiration: req.body.inspiration || [],
-      storeLinks: req.body.storeLinks || [], // ✅ EKLENDİ
+      storeLinks: req.body.storeLinks || [], 
       languages: req.body.languages || { audio: [], subtitles: [], interface: [] },
       systemRequirements: req.body.systemRequirements || { minimum: "", recommended: "" },
     };
