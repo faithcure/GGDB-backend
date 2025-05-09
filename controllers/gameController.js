@@ -66,6 +66,7 @@ exports.updateGame = async (req, res) => {
     };
 
     const updatedGame = await Game.findByIdAndUpdate(req.params.id, gameData, { new: true });
+    console.log("✅ OYUN GÜNCELLENDİ:", updatedGame);
     res.json(updatedGame);
   } catch (err) {
     res.status(400).json({ error: "Failed to update game" });
