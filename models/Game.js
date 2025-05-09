@@ -32,7 +32,7 @@ const GameSchema = new mongoose.Schema({
     {
       platform: String,
       url: String,
-    },
+    }
   ],
   crew: [String],
   awards: [String],
