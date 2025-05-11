@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: { type: String, default: "user" },
   deleted: { type: Boolean, default: false }, 
+  banned: { type: Boolean, default: false },
 }, {
   timestamps: true,
 });
