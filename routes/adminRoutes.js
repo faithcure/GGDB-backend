@@ -24,6 +24,26 @@ router.get("/users/:id", authMiddleware, async (req, res) => {
   }
 });
 
+// ✅ Kullanıcının rolünü güncelle
+router.put("/users/:id/role", authMiddleware, async (req, res) => {
+  try {
+    const { role } = req.body;
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      { role },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "Role updated successfully", user: updatedUser });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update role", error: err.message });
+  }
+});
+
 // ✅ Kullanıcıyı silinmiş olarak işaretle
 router.delete("/users/:id", authMiddleware, async (req, res) => {
   try {
