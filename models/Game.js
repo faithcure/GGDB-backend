@@ -32,6 +32,11 @@ const GameSchema = new mongoose.Schema({
     {
       platform: String,
       url: String,
+      type: {
+        type: String,
+        enum: ["digital", "physical"],
+        default: "digital"
+      }
     }
   ],
   crew: [String],
