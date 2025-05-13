@@ -15,7 +15,11 @@ const DEFAULT_SCORES = {
 // 📌 Get average rating for a game
 router.get("/avg/:gameId", async (req, res) => {
   const ratings = await Rating.find({ gameId: req.params.gameId });
-  if (!ratings.length) return res.json({ average: null, total: 0 });
+
+  // Oy yoksa boş ortalama döndür (null değil!)
+  if (!ratings.length) {
+    return res.json({ average: { ...DEFAULT_SCORES }, total: 0 });
+  }
 
   const avg = { ...DEFAULT_SCORES };
   ratings.forEach(r => {
