@@ -11,13 +11,17 @@ const ratingRoutes = require("./routes/ratingRoutes");
 const app = express();
 
 // ✅ CORS Ayarı — sadece Vercel frontend'e izin ver
-const allowedOrigins = ["https://ggdb.vercel.app"];
+const allowedOrigins = [
+  "https://ggdb.vercel.app",
+  "http://localhost:3000"
+];
 app.use(
   cors({
     origin: function (origin, callback) {
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
+        console.warn("❌ Blocked by CORS:", origin);
         callback(new Error("Not allowed by CORS"));
       }
     },
@@ -29,20 +33,20 @@ app.use(
 app.use(express.json());
 
 // ✅ DEBUG: API route'ları yükleniyor
-console.log("✅ Registering /api/games");
+
 app.use("/api/games", gameRoutes);
 
-console.log("✅ Registering /api/auth");
+
 app.use("/api/auth", authRoutes);
 
 console.log("✅ Registering /api/admin");
 app.use("/api/admin", adminRoutes);
 
-console.log("✅ Registering /api/ratings");
+
 app.use("/api/ratings", ratingRoutes);
 
 // ✅ CORS preflight desteği
-app.options("*", cors());
+app.options(/.*/, cors());
 
 // ✅ MongoDB bağlantısı
 mongoose
