@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Rating = require("../models/Rating");
-const auth = require("../middleware/authMiddleware");
+const { authMiddleware } = require("../middleware/authMiddleware");
 
 const DEFAULT_SCORES = {
   music: 5,
@@ -12,11 +12,10 @@ const DEFAULT_SCORES = {
   replayability: 5,
 };
 
-// 📌 Get average rating for a game
+// 📌 Ortalama puanı getir
 router.get("/avg/:gameId", async (req, res) => {
   const ratings = await Rating.find({ gameId: req.params.gameId });
 
-  // Oy yoksa boş ortalama döndür (null değil!)
   if (!ratings.length) {
     return res.json({ average: { ...DEFAULT_SCORES }, total: 0 });
   }
@@ -36,18 +35,17 @@ router.get("/avg/:gameId", async (req, res) => {
   res.json({ average: avg, total });
 });
 
-// 📌 Get current user's rating (for edit form)
-router.get("/:gameId", auth, async (req, res) => {
+// 📌 Kullanıcının mevcut puanı (örnek: form öncesi)
+router.get("/:gameId", authMiddleware, async (req, res) => {
   const rating = await Rating.findOne({ gameId: req.params.gameId, userId: req.user.id });
   if (!rating) return res.status(204).send();
 
-  // ✅ Eksik scores alanlarını tamamla
   const completeScores = { ...DEFAULT_SCORES, ...rating.scores };
   res.json({ ...rating.toObject(), scores: completeScores });
 });
 
-// 📌 Add or update user's rating
-router.post("/:gameId", auth, async (req, res) => {
+// 📌 Kullanıcı yeni puan verirse veya güncellerse
+router.post("/:gameId", authMiddleware, async (req, res) => {
   const { scores } = req.body;
   const { gameId } = req.params;
   const userId = req.user.id;

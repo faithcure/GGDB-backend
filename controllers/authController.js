@@ -2,55 +2,38 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
-// ✅ REGISTER
+// ✅ Register
 exports.register = async (req, res) => {
-  const { username, dob, country, email, password } = req.body;
+  const { username, email, password, dob, country } = req.body;
 
   try {
-    const existing = await User.findOne({ email });
-    if (existing) {
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
       return res.status(400).json({ message: "Email is already registered." });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-
     const user = await User.create({
       username,
-      dob,
-      country,
       email,
       password: hashedPassword,
+      dob,
+      country,
     });
 
     const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.role },
+      { id: user._id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-res
-  .cookie("accessToken", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "Strict",
-    maxAge: 2 * 60 * 60 * 1000,
-  })
-  .status(201)
-  .json({
-    user: {
-      id: user._id,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-    },
-  });
-
+    res.status(201).json({ user, token });
   } catch (err) {
     res.status(500).json({ message: "Registration failed", error: err.message });
   }
 };
 
-// ✅ LOGIN
+// ✅ Login
 exports.login = async (req, res) => {
   const { email, password } = req.body;
 
@@ -59,59 +42,26 @@ exports.login = async (req, res) => {
     if (!user) return res.status(400).json({ message: "User not found." });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Invalid password." });
+    if (!isMatch) return res.status(400).json({ message: "Invalid credentials." });
 
     const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.role },
+      { id: user._id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-    res
-      .cookie("accessToken", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "Strict",
-        maxAge: 2 * 60 * 60 * 1000,
-      })
-      .status(200)
-      .json({
-        user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          role: user.role,
-        },
-      });
-
+    res.json({ user, token });
   } catch (err) {
     res.status(500).json({ message: "Login failed", error: err.message });
   }
 };
 
-// ✅ GET CURRENT USER (me)
+// ✅ Get Current User
 exports.getMe = async (req, res) => {
   try {
-    const token = req.cookies.accessToken;
-    if (!token) return res.status(401).json({ message: "No token" });
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select("-password");
-
-    if (!user) return res.status(404).json({ message: "User not found" });
-
+    const user = await User.findById(req.user.id).select("-password");
     res.json(user);
   } catch (err) {
-    res.status(401).json({ message: "Invalid or expired token" });
+    res.status(401).json({ message: "Unauthorized" });
   }
-};
-exports.logout = (req, res) => {
-  res
-    .clearCookie("accessToken", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "Strict",
-    })
-    .status(200)
-    .json({ message: "Logged out successfully" });
 };
