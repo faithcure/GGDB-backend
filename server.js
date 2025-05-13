@@ -7,6 +7,7 @@ const gameRoutes = require("./routes/gameRoutes");
 const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const ratingRoutes = require("./routes/ratingRoutes");
+const cookieParser = require("cookie-parser");
 
 const app = express();
 
@@ -28,7 +29,7 @@ app.use(
     credentials: true,
   })
 );
-
+app.use(cookieParser());
 // ✅ JSON middleware
 app.use(express.json());
 
