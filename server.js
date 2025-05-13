@@ -28,10 +28,17 @@ app.use(
 // ✅ JSON middleware
 app.use(express.json());
 
-// ✅ API route'ları
+// ✅ DEBUG: API route'ları yükleniyor
+console.log("✅ Registering /api/games");
 app.use("/api/games", gameRoutes);
+
+console.log("✅ Registering /api/auth");
 app.use("/api/auth", authRoutes);
+
+console.log("✅ Registering /api/admin");
 app.use("/api/admin", adminRoutes);
+
+console.log("✅ Registering /api/ratings");
 app.use("/api/ratings", ratingRoutes);
 
 // ✅ CORS preflight desteği
@@ -43,11 +50,11 @@ mongoose
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
-  .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch((err) => console.error("❌ MongoDB connection error:", err));
 
 // ✅ Server başlat
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
