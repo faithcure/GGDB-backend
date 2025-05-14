@@ -35,3 +35,26 @@ router.delete("/users/:id", authMiddleware, adminOnly, async (req, res) => {
 });
 
 module.exports = router;
+
+router.get("/users/:id", authMiddleware, adminOnly, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password");
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch user", error: err.message });
+  }
+});
+
+router.put("/users/:id/ban", authMiddleware, adminOnly, async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { banned: true },
+      { new: true }
+    );
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to ban user" });
+  }
+}); 
