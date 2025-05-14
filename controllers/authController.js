@@ -1,39 +1,46 @@
-const bcrypt = require("bcryptjs");
+// 📁 controllers/authController.js
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 const User = require("../models/User");
 
-// ✅ Register
+// ✅ REGISTER
 exports.register = async (req, res) => {
-  const { username, email, password, dob, country } = req.body;
+  const { username, dob, country, email, password } = req.body;
 
   try {
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "Email is already registered." });
-    }
+    const existing = await User.findOne({ email });
+    if (existing) return res.status(400).json({ message: "Email is already registered." });
 
     const hashedPassword = await bcrypt.hash(password, 10);
+
     const user = await User.create({
-      username,
-      email,
-      password: hashedPassword,
-      dob,
-      country,
+      username, dob, country, email, password: hashedPassword,
     });
 
     const token = jwt.sign(
-      { id: user._id, role: user.role },
+      { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-    res.status(201).json({ user, token });
+    res.json({
+      token,
+      user: {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        country: user.country,
+        dob: user.dob,
+        role: user.role,
+      }
+    });
   } catch (err) {
-    res.status(500).json({ message: "Registration failed", error: err.message });
+    console.error("Register error", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// ✅ Login
+// ✅ LOGIN
 exports.login = async (req, res) => {
   const { email, password } = req.body;
 
@@ -45,23 +52,36 @@ exports.login = async (req, res) => {
     if (!isMatch) return res.status(400).json({ message: "Invalid credentials." });
 
     const token = jwt.sign(
-      { id: user._id, role: user.role },
+      { id: user._id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
 
-    res.json({ user, token });
+    res.json({
+      token,
+      user: {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        country: user.country,
+        dob: user.dob,
+        role: user.role,
+      }
+    });
   } catch (err) {
-    res.status(500).json({ message: "Login failed", error: err.message });
+    console.error("Login error", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// ✅ Get Current User
+// ✅ ME (kendi bilgilerini getir)
 exports.getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
+    if (!user) return res.status(404).json({ message: "User not found" });
     res.json(user);
   } catch (err) {
-    res.status(401).json({ message: "Unauthorized" });
+    console.error("GetMe error", err);
+    res.status(500).json({ message: "Server error" });
   }
 };

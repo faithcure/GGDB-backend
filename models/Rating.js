@@ -11,7 +11,10 @@ const RatingSchema = new mongoose.Schema({
     bugs: { type: Number, min: 0, max: 10 },
     replayability: { type: Number, min: 0, max: 10 },
   },
+  reviewText: { type: String, default: "" },        // ⭐ yorum
+  liked: { type: Boolean, default: null },           // 👍 beğendi mi (true/false)
   createdAt: { type: Date, default: Date.now },
-});
+}, { timestamps: true });
+
 
 module.exports = mongoose.model("Rating", RatingSchema);
