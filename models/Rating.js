@@ -13,6 +13,7 @@ const RatingSchema = new mongoose.Schema({
     bugs: { type: Number, min: 0, max: 10 },
     replayability: { type: Number, min: 0, max: 10 },
   },
+  avarageScore: { type: Number, min: 0, max: 10, default: 0 },
   reviewText: { type: String, default: "" },
   liked: { type: Boolean, default: null },
   createdAt: { type: Date, default: Date.now },

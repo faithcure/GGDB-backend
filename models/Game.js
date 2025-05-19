@@ -28,6 +28,8 @@ const GameSchema = new mongoose.Schema({
     subtitles: [String],
     interface: [String],
   },
+  ggdbRating: { type: Number, default: 0 },    // ⭐️ GGDB puan ortalaması
+  ratingCount: { type: Number, default: 0 },   // (opsiyonel) Toplam oy sayısı
   storeLinks: [
     {
       platform: String,

@@ -63,8 +63,17 @@ exports.submitRating = async (req, res) => {
         allRatings.reduce((sum, r) => sum + (r.scores[cat] || 0), 0) / allRatings.length
       ).toFixed(2);
     });
+    // Tek bir genel ortalama puan hesapla
+    const overallAverage = (
+      Object.values(avg).reduce((acc, val) => acc + Number(val), 0) / categories.length
+    ).toFixed(2);
 
-    await Game.findByIdAndUpdate(gameId, { averageRating: avg });
+    await Game.findByIdAndUpdate(gameId, {
+      averageRating: avg,         // kategori bazlı breakdown
+      ggdbRating: overallAverage, // ⭐️ GENEL GGDB PUANI
+      ratingCount: allRatings.length, // toplam oy
+    });
+
 
     res.json({ rating, average: avg });
   } catch (err) {
