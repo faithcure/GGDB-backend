@@ -4,12 +4,12 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 require("dotenv").config();
-
+const userActivityRoutes = require("./routes/userActivityRoutes");
 const gameRoutes = require("./routes/gameRoutes");
 const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const ratingRoutes = require("./routes/ratingRoutes");
-
+const reviewRoutes = require("./routes/reviewRoutes");
 const app = express();
 
 // ✅ CORS — sadece izinli origin'lere açık
@@ -38,8 +38,9 @@ app.use("/api/games", gameRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/ratings", ratingRoutes);
-
-// MongoDB Connection
+app.use("/api/reviews", reviewRoutes);
+app.use("/api/user-activity", userActivityRoutes);
+// MongoDB Connection 
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
