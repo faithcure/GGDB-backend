@@ -8,6 +8,38 @@ exports.getAllGames = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch games" });
   }
 };
+// Tüm reviewları getir
+exports.getGameReviews = async (req, res) => {
+  const gameId = req.params.id;
+  // Game modelinde reviewlar bir array içindeyse:
+  try {
+    const game = await Game.findById(gameId);
+    if (!game) return res.status(404).json({ error: "Game not found" });
+    res.json(game.reviews || []);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+// Yeni review ekle
+exports.addGameReview = async (req, res) => {
+  const gameId = req.params.id;
+  const { user, comment, rating, spoiler } = req.body;
+  try {
+    const game = await Game.findById(gameId);
+    if (!game) return res.status(404).json({ error: "Game not found" });
+
+    // Basitçe reviews arrayine ekle
+    if (!game.reviews) game.reviews = [];
+    game.reviews.push({
+      user, comment, rating, spoiler, date: new Date()
+    });
+    await game.save();
+    res.status(201).json({ success: true, reviews: game.reviews });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
 
 exports.getGameById = async (req, res) => {
   try {
