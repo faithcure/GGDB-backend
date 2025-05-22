@@ -2,7 +2,6 @@ const Review = require("../models/Review");
 const UserActivity = require("../models/UserActivity");
 const mongoose = require("mongoose");
 
-
 const voteReview = async (req, res) => {
   const { reviewId } = req.params;
   const { voteType } = req.body;
@@ -16,14 +15,29 @@ const voteReview = async (req, res) => {
 
     const userObjectId = new mongoose.Types.ObjectId(userId);
 
-    review.likedBy = (review.likedBy || []).filter(id => id && id.toString() !== userObjectId.toString());
-    review.dislikedBy = (review.dislikedBy || []).filter(id => id && id.toString() !== userObjectId.toString());
+    const alreadyLiked = review.likedBy?.some(id => id.toString() === userObjectId.toString());
+    const alreadyDisliked = review.dislikedBy?.some(id => id.toString() === userObjectId.toString());
 
-
+    // 👍 Like
     if (voteType === "like") {
-      review.likedBy.push(userObjectId);
-    } else if (voteType === "dislike") {
-      review.dislikedBy.push(userObjectId);
+      if (alreadyLiked) {
+        // Kaldır
+        review.likedBy = review.likedBy.filter(id => id.toString() !== userObjectId.toString());
+      } else {
+        // Dislike varsa kaldır, sonra like ekle
+        review.dislikedBy = review.dislikedBy.filter(id => id.toString() !== userObjectId.toString());
+        review.likedBy.push(userObjectId);
+      }
+    }
+
+    // 👎 Dislike
+    else if (voteType === "dislike") {
+      if (alreadyDisliked) {
+        review.dislikedBy = review.dislikedBy.filter(id => id.toString() !== userObjectId.toString());
+      } else {
+        review.likedBy = review.likedBy.filter(id => id.toString() !== userObjectId.toString());
+        review.dislikedBy.push(userObjectId);
+      }
     }
 
     await review.save();
@@ -31,13 +45,18 @@ const voteReview = async (req, res) => {
     res.json({
       likes: review.likedBy.length,
       dislikes: review.dislikedBy.length,
-      userVote: voteType
+      userVote: voteType === "like"
+        ? (alreadyLiked ? null : "like")
+        : voteType === "dislike"
+          ? (alreadyDisliked ? null : "dislike")
+          : null
     });
   } catch (err) {
-    console.error("\u274C Failed to vote on review:", err);
+    console.error("❌ Failed to vote on review:", err);
     res.status(500).json({ error: "Failed to vote" });
   }
 };
+
 const deleteReview = async (req, res) => {
   try {
     const { reviewId } = req.params;
@@ -49,8 +68,6 @@ const deleteReview = async (req, res) => {
   }
 };
 
-
-
 const getReviews = async (req, res) => {
   try {
     const { gameId } = req.params;
@@ -59,7 +76,7 @@ const getReviews = async (req, res) => {
     const reviews = await Review.find({ gameId })
       .sort({ date: -1 })
       .limit(limit)
-      .lean(); // ObjectId yerine düz veri döner
+      .lean();
 
     const updated = reviews.map(r => ({
       ...r,
@@ -74,7 +91,7 @@ const getReviews = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch reviews" });
   }
 };
-// POST /api/reviews/:gameId
+
 const addReview = async (req, res) => {
   try {
     const { gameId } = req.params;
@@ -90,9 +107,8 @@ const addReview = async (req, res) => {
 
     await newReview.save();
 
-    // 🟡 Burada etkinlik olarak kaydediyoruz:
     const userActivity = new UserActivity({
-      userId: req.userId || "000000000000000000000000", // Gerçek kullanıcı ID'si JWT ile eklenirse değiştir
+      userId: req.userId || "000000000000000000000000",
       activityType: "review",
       gameId,
       targetReviewId: newReview._id,
@@ -109,6 +125,5 @@ const addReview = async (req, res) => {
     res.status(500).json({ error: "Failed to submit review" });
   }
 };
-
 
 module.exports = { getReviews, addReview, voteReview, deleteReview };
