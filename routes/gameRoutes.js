@@ -11,6 +11,9 @@ const {
 } = require("../controllers/gameController");
 const { getSimilarGames } = require("../controllers/gameController");
 router.get("/:id/similar", getSimilarGames);
+const { getTopRatedGames } = require("../controllers/gameController");
+router.get("/top/rated", getTopRatedGames);
+
 // GET all games
 router.get("/", getAllGames);
 

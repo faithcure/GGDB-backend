@@ -80,6 +80,17 @@ exports.getSimilarGames = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch similar games" });
   }
 };
+exports.getTopRatedGames = async (req, res) => {
+  try {
+    const topGames = await Game.find()
+      .sort({ ggdbRating: -1 })
+      .limit(5)
+      .select("title coverImage ggdbRating");
+    res.json(topGames);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch top rated games" });
+  }
+};
 
 exports.createGame = async (req, res) => {
   try {
