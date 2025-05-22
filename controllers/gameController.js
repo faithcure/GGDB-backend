@@ -50,6 +50,36 @@ exports.getGameById = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch game" });
   }
 };
+exports.getSimilarGames = async (req, res) => {
+  const gameId = req.params.id;
+
+  try {
+    const currentGame = await Game.findById(gameId);
+    if (!currentGame) return res.status(404).json({ error: "Game not found" });
+
+    const similarGames = await Game.find({
+      _id: { $ne: gameId },
+      $or: [
+        { genres: { $in: currentGame.genres || [] } },
+        { platforms: { $in: currentGame.platforms || [] } },
+      ],
+    })
+      .limit(5)
+      .select("title coverImage _id")
+      .lean();
+
+    if (!similarGames.length) {
+      const fallback = await Game.find({ _id: { $ne: gameId } })
+        .limit(5)
+        .select("title coverImage _id");
+      return res.json(fallback);
+    }
+
+    res.json(similarGames);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch similar games" });
+  }
+};
 
 exports.createGame = async (req, res) => {
   try {

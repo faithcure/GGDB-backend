@@ -9,7 +9,8 @@ const {
   getGameReviews,
   addGameReview
 } = require("../controllers/gameController");
-
+const { getSimilarGames } = require("../controllers/gameController");
+router.get("/:id/similar", getSimilarGames);
 // GET all games
 router.get("/", getAllGames);
 
