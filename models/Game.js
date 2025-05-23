@@ -42,7 +42,14 @@ const GameSchema = new mongoose.Schema({
     }
   ],
   crew: [String],
-  awards: [String],
+  awards: [
+  {
+    title: String,
+    date: String,
+    category: String,
+    recipient: String
+  }
+  ],
   metacriticScore: Number,
   userRating: Number,
   mainPlaytime: Number,
