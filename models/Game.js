@@ -22,7 +22,27 @@ const GameSchema = new mongoose.Schema({
   cast: [String],
   contentWarnings: [String],
   ageRatings: [String],
-  gallery: [String],
+  gallery: [
+    {
+      url: String,
+      title: String,
+      artist: String,
+      date: String,
+      source: String,
+      mediaType: String,
+      edited: { type: Boolean, default: false },
+      meta: [
+        {
+          label: String,
+          value: String
+        }
+      ]
+    }
+  ],
+  bannerOverrides: {
+    posterImage: String,   // Admin panelinden değiştirilen poster url'si
+    trailerUrl: String,    // Admin panelinden değiştirilen trailer/video url'si
+  },
   languages: {
     audio: [String],
     subtitles: [String],
@@ -69,4 +89,5 @@ const GameSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-module.exports = mongoose.model("Game", GameSchema);
+module.exports = mongoose.model("Games", GameSchema);
+

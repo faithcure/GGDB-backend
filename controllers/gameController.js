@@ -106,7 +106,7 @@ exports.createGame = async (req, res) => {
       dlcs: req.body.dlcs || [],
       awards: req.body.awards || [],
       inspiration: req.body.inspiration || [],
-      storeLinks: req.body.storeLinks || [], 
+      storeLinks: req.body.storeLinks || [],
       languages: req.body.languages || { audio: [], subtitles: [], interface: [] },
       systemRequirements: req.body.systemRequirements || { minimum: "", recommended: "" },
     };
@@ -115,7 +115,13 @@ exports.createGame = async (req, res) => {
     await newGame.save();
     res.status(201).json(newGame);
   } catch (err) {
-    res.status(400).json({ error: "Failed to add game" });
+    console.error("Game create error:", err); // Şu satır KESİNLİKLE olmalı!
+    res.status(400).json({
+      error: "Failed to add game",
+      detail: err.message,
+      fields: err.errors,
+      stack: err.stack,
+    });
   }
 };
 
