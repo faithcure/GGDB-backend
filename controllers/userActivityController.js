@@ -46,18 +46,19 @@ exports.toggleDislike = async (req, res) => {
 
 // Progress kaydet/güncelle (tek kayıt)
 exports.saveProgress = async (req, res) => {
-  const { gameId, progress } = req.body;
-  const userId = req.user.id;
-
   try {
-    const activity = await UserActivity.findOneAndUpdate(
+    const { gameId, progress } = req.body;
+    const userId = req.user.id; // Auth'dan geliyor
+
+    // UserActivity modeline kaydet veya güncelle
+    let activity = await UserActivity.findOneAndUpdate(
       { userId, gameId, activityType: "progress" },
-      { progress, date: new Date() },
-      { new: true, upsert: true }
+      { progress, activityType: "progress", date: new Date() },
+      { upsert: true, new: true }
     );
     res.json(activity);
   } catch (err) {
-    res.status(500).json({ error: "Failed to save progress" });
+    res.status(500).json({ error: "Progress save failed" });
   }
 };
 
@@ -73,6 +74,36 @@ exports.getLastProgress = async (req, res) => {
     res.json({ progress: last ? last.progress : 0 });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch progress" });
+  }
+};
+// Plan To Play ekle/çıkar (toggle)
+exports.togglePlanToPlay = async (req, res) => {
+  const userId = req.user.id;
+  const { gameId } = req.body;
+
+  try {
+    const filter = { userId, gameId, activityType: "plantoplay" };
+    const existing = await UserActivity.findOne(filter);
+    if (existing) {
+      await UserActivity.deleteOne({ _id: existing._id }); // Varsa kaldır
+      return res.json({ plantoplay: false });
+    } else {
+      await UserActivity.create(filter); // Yoksa ekle
+      return res.json({ plantoplay: true });
+    }
+  } catch (err) {
+    res.status(500).json({ error: "Failed to toggle plan to play" });
+  }
+};
+
+// Plan to play status oku
+exports.getPlanToPlayStatus = async (req, res) => {
+  const { userId, gameId } = req.params;
+  try {
+    const plan = await UserActivity.findOne({ userId, gameId, activityType: "plantoplay" });
+    res.json({ plantoplay: !!plan });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to get plan to play status" });
   }
 };
 

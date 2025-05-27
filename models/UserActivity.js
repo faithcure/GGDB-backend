@@ -8,7 +8,7 @@ const userActivitySchema = new mongoose.Schema({
   },
   activityType: {
     type: String,
-    enum: ["review", "like", "dislike", "progress"], // progress eklendi
+    enum: ["review", "like", "dislike", "progress", "plantoplay"], // progress eklendi
     required: true,
   },
   gameId: {
@@ -22,7 +22,7 @@ const userActivitySchema = new mongoose.Schema({
   comment: String,
   rating: Number,
   spoiler: Boolean,
-  progress: Number, // Progress bar için
+  progress: Number, 
   date: {
     type: Date,
     default: Date.now,

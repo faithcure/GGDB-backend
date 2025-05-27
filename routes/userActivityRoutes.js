@@ -6,7 +6,9 @@ const {
   getDislikeStatus,
   saveProgress,
   getLastProgress,
-  getUserActivity
+  getUserActivity,
+  togglePlanToPlay,
+  getPlanToPlayStatus,
 } = require("../controllers/userActivityController");
 const { authMiddleware } = require("../middleware/authMiddleware");
 const router = express.Router();
@@ -18,5 +20,6 @@ router.get("/dislike/:userId/:gameId", authMiddleware, getDislikeStatus);
 router.post("/progress", authMiddleware, saveProgress);
 router.get("/progress/:userId/:gameId", authMiddleware, getLastProgress);
 router.get("/:userId", getUserActivity);
-
+router.post("/plantoplay", authMiddleware, togglePlanToPlay);
+router.get("/plantoplay/:userId/:gameId", authMiddleware, getPlanToPlayStatus);
 module.exports = router;
