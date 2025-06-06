@@ -96,3 +96,39 @@ exports.getMe = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+
+// Kullanıcı kendi profilini günceller
+exports.updateMe = async (req, res) => {
+  try {
+    // LOG: Hangi güncellemeler geliyor?
+    console.log("updateMe gelen updates:", req.body);
+
+    // Sadece modelde olan alanlara izin ver (süper güvenli!)
+    const allowedFields = [
+      "username", "title", "avatar", "bio", "website", "coverImage",
+      "socials", "userTypes", "roles"
+    ];
+    let updates = {};
+    for (const key of allowedFields) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+
+    // "roles" sadece string array gelirse object array'e çevir
+    if (Array.isArray(updates.roles) && typeof updates.roles[0] === "string") {
+      updates.roles = updates.roles.map(r => ({ name: r }));
+    }
+
+    // Güncelle!
+    const user = await User.findByIdAndUpdate(
+        req.user.id,
+        updates,
+        { new: true }
+    ).select("-password");
+
+    res.json(user);
+  } catch (err) {
+    console.error("updateMe error:", err); // ← detaylı hata burada!
+    res.status(500).json({ message: "Update failed", error: err.message });
+  }
+};
