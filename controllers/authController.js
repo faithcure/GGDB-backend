@@ -97,38 +97,322 @@ exports.getMe = async (req, res) => {
   }
 };
 
+// authController.js updateMe fonksiyonu - Genres ve Consoles desteği eklendi
 
-// Kullanıcı kendi profilini günceller
 exports.updateMe = async (req, res) => {
   try {
-    // LOG: Hangi güncellemeler geliyor?
-    console.log("updateMe gelen updates:", req.body);
+    console.log("🔄 updateMe incoming updates:", req.body);
+    console.log("🔍 User ID from token:", req.user.id);
 
-    // Sadece modelde olan alanlara izin ver (süper güvenli!)
+    // Sadece modelde olan alanlara izin ver (güvenlik)
     const allowedFields = [
       "username", "title", "avatar", "bio", "website", "coverImage",
-      "socials", "userTypes", "roles"
+      "socials", "userTypes", "roles", "platforms", "favoriteGenres", "favoriteConsoles"
     ];
+
     let updates = {};
     for (const key of allowedFields) {
-      if (req.body[key] !== undefined) updates[key] = req.body[key];
+      if (req.body[key] !== undefined) {
+        updates[key] = req.body[key];
+      }
     }
 
-    // "roles" sadece string array gelirse object array'e çevir
+    // Bio validasyonu
+    if (updates.bio !== undefined) {
+      if (typeof updates.bio !== 'string') {
+        return res.status(400).json({
+          message: "Bio must be a string",
+          field: "bio"
+        });
+      }
+
+      if (updates.bio.length > 500) {
+        return res.status(400).json({
+          message: "Bio cannot exceed 500 characters",
+          field: "bio",
+          currentLength: updates.bio.length,
+          maxLength: 500
+        });
+      }
+
+      if (updates.bio.trim() && updates.bio.trim().length < 50) {
+        return res.status(400).json({
+          message: "Bio should be at least 50 characters long",
+          field: "bio",
+          currentLength: updates.bio.trim().length,
+          minLength: 50
+        });
+      }
+
+      updates.bio = updates.bio.trim();
+    }
+
+    // Platforms validasyonu
+    if (updates.platforms !== undefined) {
+      if (!Array.isArray(updates.platforms)) {
+        return res.status(400).json({
+          message: "Platforms must be an array",
+          field: "platforms"
+        });
+      }
+
+      if (updates.platforms.length > 10) {
+        return res.status(400).json({
+          message: "Maximum 10 platforms allowed",
+          field: "platforms",
+          currentCount: updates.platforms.length,
+          maxCount: 10
+        });
+      }
+
+      const validatedPlatforms = [];
+      const seenKeys = new Set();
+
+      for (let i = 0; i < updates.platforms.length; i++) {
+        const platform = updates.platforms[i];
+
+        if (!platform || typeof platform !== 'object') {
+          return res.status(400).json({
+            message: `Platform at index ${i} must be an object`,
+            field: "platforms"
+          });
+        }
+
+        if (!platform.key || typeof platform.key !== 'string') {
+          return res.status(400).json({
+            message: `Platform at index ${i} must have a valid key`,
+            field: "platforms"
+          });
+        }
+
+        if (!platform.name || typeof platform.name !== 'string') {
+          return res.status(400).json({
+            message: `Platform at index ${i} must have a valid name`,
+            field: "platforms"
+          });
+        }
+
+        const normalizedKey = platform.key.toLowerCase().trim();
+
+        if (seenKeys.has(normalizedKey)) {
+          return res.status(400).json({
+            message: `Duplicate platform: ${platform.name}`,
+            field: "platforms"
+          });
+        }
+        seenKeys.add(normalizedKey);
+
+        const cleanPlatform = {
+          key: normalizedKey,
+          name: platform.name.trim(),
+          verified: Boolean(platform.verified || false),
+          username: (platform.username || "").toString().trim(),
+          profileUrl: (platform.profileUrl || "").toString().trim(),
+          addedAt: platform.addedAt || new Date()
+        };
+
+        validatedPlatforms.push(cleanPlatform);
+      }
+
+      updates.platforms = validatedPlatforms;
+      console.log("✅ Platforms validated:", validatedPlatforms.length, "platforms");
+    }
+
+    // Favorite Genres validasyonu
+    if (updates.favoriteGenres !== undefined) {
+      if (!Array.isArray(updates.favoriteGenres)) {
+        return res.status(400).json({
+          message: "Favorite genres must be an array",
+          field: "favoriteGenres"
+        });
+      }
+
+      if (updates.favoriteGenres.length > 15) {
+        return res.status(400).json({
+          message: "Maximum 15 genres allowed",
+          field: "favoriteGenres",
+          currentCount: updates.favoriteGenres.length,
+          maxCount: 15
+        });
+      }
+
+      const validatedGenres = [];
+      const seenGenres = new Set();
+
+      for (let i = 0; i < updates.favoriteGenres.length; i++) {
+        const genre = updates.favoriteGenres[i];
+
+        // String olarak gönderilmişse objeye çevir
+        let genreObj;
+        if (typeof genre === 'string') {
+          genreObj = {
+            name: genre,
+            key: genre.toLowerCase().trim(),
+            color: ['#8B5CF6', '#06B6D4', '#10B981', '#F59E0B', '#EF4444', '#EC4899'][i % 6],
+            percentage: Math.floor(Math.random() * 30) + 10
+          };
+        } else if (genre && typeof genre === 'object') {
+          genreObj = {
+            name: genre.name || genre.key || '',
+            key: (genre.key || genre.name || '').toLowerCase().trim(),
+            color: genre.color || '#8B5CF6',
+            percentage: genre.percentage || 0
+          };
+        } else {
+          continue; // Geçersiz genre'yi atla
+        }
+
+        if (!genreObj.name || !genreObj.key) {
+          continue; // Boş genre'yi atla
+        }
+
+        if (seenGenres.has(genreObj.key)) {
+          continue; // Duplicate genre'yi atla
+        }
+        seenGenres.add(genreObj.key);
+
+        validatedGenres.push(genreObj);
+      }
+
+      updates.favoriteGenres = validatedGenres;
+      console.log("✅ Genres validated:", validatedGenres.length, "genres");
+    }
+
+    // Favorite Consoles validasyonu
+    if (updates.favoriteConsoles !== undefined) {
+      if (!Array.isArray(updates.favoriteConsoles)) {
+        return res.status(400).json({
+          message: "Favorite consoles must be an array",
+          field: "favoriteConsoles"
+        });
+      }
+
+      if (updates.favoriteConsoles.length > 20) {
+        return res.status(400).json({
+          message: "Maximum 20 consoles allowed",
+          field: "favoriteConsoles",
+          currentCount: updates.favoriteConsoles.length,
+          maxCount: 20
+        });
+      }
+
+      const validatedConsoles = [];
+      const seenConsoles = new Set();
+
+      for (let i = 0; i < updates.favoriteConsoles.length; i++) {
+        const console = updates.favoriteConsoles[i];
+
+        // String olarak gönderilmişse objeye çevir
+        let consoleObj;
+        if (typeof console === 'string') {
+          consoleObj = {
+            name: console,
+            key: console.toLowerCase().trim(),
+            generation: 'Unknown',
+            addedAt: new Date()
+          };
+        } else if (console && typeof console === 'object') {
+          consoleObj = {
+            name: console.name || console.key || '',
+            key: (console.key || console.name || '').toLowerCase().trim(),
+            generation: console.generation || 'Unknown',
+            addedAt: console.addedAt || new Date()
+          };
+        } else {
+          continue; // Geçersiz console'u atla
+        }
+
+        if (!consoleObj.name || !consoleObj.key) {
+          continue; // Boş console'u atla
+        }
+
+        if (seenConsoles.has(consoleObj.key)) {
+          continue; // Duplicate console'u atla
+        }
+        seenConsoles.add(consoleObj.key);
+
+        validatedConsoles.push(consoleObj);
+      }
+
+      updates.favoriteConsoles = validatedConsoles;
+      console.log("✅ Consoles validated:", validatedConsoles.length, "consoles");
+    }
+
+    // "roles" array handling
     if (Array.isArray(updates.roles) && typeof updates.roles[0] === "string") {
       updates.roles = updates.roles.map(r => ({ name: r }));
     }
 
-    // Güncelle!
+    // "socials" array validation
+    if (updates.socials && Array.isArray(updates.socials)) {
+      updates.socials = updates.socials.filter(s => s.platform && s.link);
+    }
+
+    // "userTypes" array validation
+    if (updates.userTypes && Array.isArray(updates.userTypes)) {
+      updates.userTypes = updates.userTypes.filter(t => t && typeof t === 'string');
+    }
+
+    console.log("🔄 Processed updates:", Object.keys(updates));
+
+    // Kullanıcıyı güncelle
     const user = await User.findByIdAndUpdate(
         req.user.id,
         updates,
-        { new: true }
+        {
+          new: true,
+          runValidators: true
+        }
     ).select("-password");
 
-    res.json(user);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    console.log("✅ User successfully updated:", {
+      id: user._id,
+      username: user.username,
+      updatedFields: Object.keys(updates),
+      platformCount: user.platforms?.length || 0,
+      genreCount: user.favoriteGenres?.length || 0,
+      consoleCount: user.favoriteConsoles?.length || 0
+    });
+
+    // Başarılı response
+    res.json({
+      message: "Profile updated successfully",
+      user: user,
+      updatedFields: Object.keys(updates)
+    });
+
   } catch (err) {
-    console.error("updateMe error:", err); // ← detaylı hata burada!
-    res.status(500).json({ message: "Update failed", error: err.message });
+    console.error("❌ updateMe error:", err);
+
+    // Mongoose validation error handling
+    if (err.name === 'ValidationError') {
+      const validationErrors = Object.values(err.errors).map(e => ({
+        field: e.path,
+        message: e.message
+      }));
+
+      return res.status(400).json({
+        message: "Validation failed",
+        errors: validationErrors
+      });
+    }
+
+    // Duplicate key error
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern)[0];
+      return res.status(400).json({
+        message: `${field} already exists`,
+        field: field
+      });
+    }
+
+    res.status(500).json({
+      message: "Update failed",
+      error: err.message
+    });
   }
 };
