@@ -1,4 +1,4 @@
-// 📁 controllers/authController.js
+// 📁 controllers/authController.js - Complete with all functions
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
@@ -29,9 +29,9 @@ exports.register = async (req, res) => {
     });
 
     const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+        { id: user._id, email: user.email, role: user.role },
+        process.env.JWT_SECRET,
+        { expiresIn: "7d" }
     );
 
     res.json({
@@ -63,9 +63,9 @@ exports.login = async (req, res) => {
     if (!isMatch) return res.status(400).json({ message: "Invalid credentials." });
 
     const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+        { id: user._id, email: user.email, role: user.role },
+        process.env.JWT_SECRET,
+        { expiresIn: "7d" }
     );
 
     res.json({
@@ -97,17 +97,17 @@ exports.getMe = async (req, res) => {
   }
 };
 
-// authController.js updateMe fonksiyonu - Genres ve Consoles desteği eklendi
-
+// ✅ UPDATE ME - Enhanced with professional fields
 exports.updateMe = async (req, res) => {
   try {
     console.log("🔄 updateMe incoming updates:", req.body);
     console.log("🔍 User ID from token:", req.user.id);
 
-    // Sadece modelde olan alanlara izin ver (güvenlik)
+    // Sadece modelde olan alanlara izin ver (güvenlik) - yeni alanlar eklendi
     const allowedFields = [
       "username", "title", "avatar", "bio", "website", "coverImage",
-      "socials", "userTypes", "roles", "platforms", "favoriteGenres", "favoriteConsoles"
+      "socials", "userTypes", "roles", "platforms", "favoriteGenres", "favoriteConsoles",
+      "education", "currentWork", "currentProjects", "careerGoals"  // YENİ ALANLAR
     ];
 
     let updates = {};
@@ -145,6 +145,90 @@ exports.updateMe = async (req, res) => {
       }
 
       updates.bio = updates.bio.trim();
+    }
+
+    // Education validasyonu
+    if (updates.education !== undefined) {
+      if (typeof updates.education !== 'string') {
+        return res.status(400).json({
+          message: "Education must be a string",
+          field: "education"
+        });
+      }
+
+      if (updates.education.length > 200) {
+        return res.status(400).json({
+          message: "Education cannot exceed 200 characters",
+          field: "education",
+          currentLength: updates.education.length,
+          maxLength: 200
+        });
+      }
+
+      updates.education = updates.education.trim();
+    }
+
+    // Current Work validasyonu
+    if (updates.currentWork !== undefined) {
+      if (typeof updates.currentWork !== 'string') {
+        return res.status(400).json({
+          message: "Current work must be a string",
+          field: "currentWork"
+        });
+      }
+
+      if (updates.currentWork.length > 200) {
+        return res.status(400).json({
+          message: "Current work cannot exceed 200 characters",
+          field: "currentWork",
+          currentLength: updates.currentWork.length,
+          maxLength: 200
+        });
+      }
+
+      updates.currentWork = updates.currentWork.trim();
+    }
+
+    // Current Projects validasyonu
+    if (updates.currentProjects !== undefined) {
+      if (typeof updates.currentProjects !== 'string') {
+        return res.status(400).json({
+          message: "Current projects must be a string",
+          field: "currentProjects"
+        });
+      }
+
+      if (updates.currentProjects.length > 300) {
+        return res.status(400).json({
+          message: "Current projects cannot exceed 300 characters",
+          field: "currentProjects",
+          currentLength: updates.currentProjects.length,
+          maxLength: 300
+        });
+      }
+
+      updates.currentProjects = updates.currentProjects.trim();
+    }
+
+    // Career Goals validasyonu
+    if (updates.careerGoals !== undefined) {
+      if (typeof updates.careerGoals !== 'string') {
+        return res.status(400).json({
+          message: "Career goals must be a string",
+          field: "careerGoals"
+        });
+      }
+
+      if (updates.careerGoals.length > 250) {
+        return res.status(400).json({
+          message: "Career goals cannot exceed 250 characters",
+          field: "careerGoals",
+          currentLength: updates.careerGoals.length,
+          maxLength: 250
+        });
+      }
+
+      updates.careerGoals = updates.careerGoals.trim();
     }
 
     // Platforms validasyonu
@@ -375,7 +459,11 @@ exports.updateMe = async (req, res) => {
       updatedFields: Object.keys(updates),
       platformCount: user.platforms?.length || 0,
       genreCount: user.favoriteGenres?.length || 0,
-      consoleCount: user.favoriteConsoles?.length || 0
+      consoleCount: user.favoriteConsoles?.length || 0,
+      hasEducation: !!user.education,
+      hasCurrentWork: !!user.currentWork,
+      hasCurrentProjects: !!user.currentProjects,
+      hasCareerGoals: !!user.careerGoals
     });
 
     // Başarılı response

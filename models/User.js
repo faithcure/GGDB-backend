@@ -1,4 +1,4 @@
-// 📁 models/User.js - Genres ve Consoles alanları eklendi
+// 📁 models/User.js - Enhanced with professional fields
 const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema({
@@ -12,11 +12,37 @@ const userSchema = new mongoose.Schema({
   deleted:    { type: Boolean, default: false },
 
   // ----- PROFIL ALANLARI -----
-  bio:        { type: String, default: "" },
+  bio:        { type: String, default: "", maxlength: 500 },
   website:    { type: String, default: "" },
   avatar:     { type: String, default: "" },
   coverImage: { type: String, default: "" },
   title:      { type: String, default: "" },
+
+  // ----- YENİ PROFESYONEL ALANLAR -----
+  education: {
+    type: String,
+    default: "",
+    maxlength: 200,
+    trim: true
+  },
+  currentWork: {
+    type: String,
+    default: "",
+    maxlength: 200,
+    trim: true
+  },
+  currentProjects: {
+    type: String,
+    default: "",
+    maxlength: 300,
+    trim: true
+  },
+  careerGoals: {
+    type: String,
+    default: "",
+    maxlength: 250,
+    trim: true
+  },
 
   // ----- SOSYAL MEDYA LINKLERI -----
   socials: [
@@ -117,6 +143,41 @@ userSchema.pre('save', function(next) {
   // Konsol sayısı kontrolü
   if (this.favoriteConsoles && this.favoriteConsoles.length > 20) {
     const error = new Error('Maximum 20 consoles allowed');
+    error.name = 'ValidationError';
+    return next(error);
+  }
+
+  // Bio karakter limiti kontrolü
+  if (this.bio && this.bio.length > 500) {
+    const error = new Error('Bio cannot exceed 500 characters');
+    error.name = 'ValidationError';
+    return next(error);
+  }
+
+  // Eğitim karakter limiti kontrolü
+  if (this.education && this.education.length > 200) {
+    const error = new Error('Education cannot exceed 200 characters');
+    error.name = 'ValidationError';
+    return next(error);
+  }
+
+  // Mevcut iş karakter limiti kontrolü
+  if (this.currentWork && this.currentWork.length > 200) {
+    const error = new Error('Current work cannot exceed 200 characters');
+    error.name = 'ValidationError';
+    return next(error);
+  }
+
+  // Mevcut projeler karakter limiti kontrolü
+  if (this.currentProjects && this.currentProjects.length > 300) {
+    const error = new Error('Current projects cannot exceed 300 characters');
+    error.name = 'ValidationError';
+    return next(error);
+  }
+
+  // Kariyer hedefleri karakter limiti kontrolü
+  if (this.careerGoals && this.careerGoals.length > 250) {
+    const error = new Error('Career goals cannot exceed 250 characters');
     error.name = 'ValidationError';
     return next(error);
   }
