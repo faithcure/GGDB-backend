@@ -1,4 +1,5 @@
 const Game = require("../models/Game");
+const mongoose = require("mongoose");
 
 exports.getAllGames = async (req, res) => {
   try {
@@ -8,15 +9,22 @@ exports.getAllGames = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch games" });
   }
 };
+
 // Tüm reviewları getir
 exports.getGameReviews = async (req, res) => {
   const gameId = req.params.id;
-  // Game modelinde reviewlar bir array içindeyse:
+
+  // MongoDB ObjectId formatını kontrol et
+  if (!mongoose.Types.ObjectId.isValid(gameId)) {
+    return res.status(400).json({ error: "Invalid game ID format" });
+  }
+
   try {
     const game = await Game.findById(gameId);
     if (!game) return res.status(404).json({ error: "Game not found" });
     res.json(game.reviews || []);
   } catch (err) {
+    console.error("Get reviews error:", err);
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -25,6 +33,12 @@ exports.getGameReviews = async (req, res) => {
 exports.addGameReview = async (req, res) => {
   const gameId = req.params.id;
   const { user, comment, rating, spoiler } = req.body;
+
+  // MongoDB ObjectId formatını kontrol et
+  if (!mongoose.Types.ObjectId.isValid(gameId)) {
+    return res.status(400).json({ error: "Invalid game ID format" });
+  }
+
   try {
     const game = await Game.findById(gameId);
     if (!game) return res.status(404).json({ error: "Game not found" });
@@ -37,21 +51,58 @@ exports.addGameReview = async (req, res) => {
     await game.save();
     res.status(201).json({ success: true, reviews: game.reviews });
   } catch (err) {
+    console.error("Add review error:", err);
     res.status(500).json({ error: "Server error" });
   }
 };
 
 exports.getGameById = async (req, res) => {
   try {
-    const game = await Game.findById(req.params.id);
-    if (!game) return res.status(404).json({ error: "Game not found" });
+    const gameId = req.params.id;
+
+    // Debug log'ları ekle
+    console.log("🔍 Received Game ID:", gameId);
+    console.log("🔍 ID Type:", typeof gameId);
+    console.log("🔍 Request params:", req.params);
+
+    // ID boş mu kontrol et
+    if (!gameId) {
+      console.error("❌ Game ID is missing");
+      return res.status(400).json({ error: "Game ID is required" });
+    }
+
+    // MongoDB ObjectId formatını kontrol et
+    if (!mongoose.Types.ObjectId.isValid(gameId)) {
+      console.error("❌ Invalid MongoDB ObjectId format:", gameId);
+      return res.status(400).json({ error: "Invalid game ID format" });
+    }
+
+    console.log("✅ Searching for game with ID:", gameId);
+    const game = await Game.findById(gameId);
+
+    if (!game) {
+      console.error("❌ Game not found with ID:", gameId);
+      return res.status(404).json({ error: "Game not found" });
+    }
+
+    console.log("✅ Game found:", game.title);
     res.json(game);
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch game" });
+    console.error("❌ Database error:", err);
+    res.status(500).json({
+      error: "Failed to fetch game",
+      details: err.message
+    });
   }
 };
+
 exports.getSimilarGames = async (req, res) => {
   const gameId = req.params.id;
+
+  // MongoDB ObjectId formatını kontrol et
+  if (!mongoose.Types.ObjectId.isValid(gameId)) {
+    return res.status(400).json({ error: "Invalid game ID format" });
+  }
 
   try {
     const currentGame = await Game.findById(gameId);
@@ -64,30 +115,33 @@ exports.getSimilarGames = async (req, res) => {
         { platforms: { $in: currentGame.platforms || [] } },
       ],
     })
-      .limit(5)
-      .select("title coverImage _id")
-      .lean();
+        .limit(5)
+        .select("title coverImage _id")
+        .lean();
 
     if (!similarGames.length) {
       const fallback = await Game.find({ _id: { $ne: gameId } })
-        .limit(5)
-        .select("title coverImage _id");
+          .limit(5)
+          .select("title coverImage _id");
       return res.json(fallback);
     }
 
     res.json(similarGames);
   } catch (err) {
+    console.error("Similar games error:", err);
     res.status(500).json({ error: "Failed to fetch similar games" });
   }
 };
+
 exports.getTopRatedGames = async (req, res) => {
   try {
     const topGames = await Game.find()
-      .sort({ ggdbRating: -1 })
-      .limit(5)
-      .select("title coverImage ggdbRating");
+        .sort({ ggdbRating: -1 })
+        .limit(5)
+        .select("title coverImage ggdbRating");
     res.json(topGames);
   } catch (err) {
+    console.error("Top rated games error:", err);
     res.status(500).json({ error: "Failed to fetch top rated games" });
   }
 };
@@ -107,26 +161,34 @@ exports.createGame = async (req, res) => {
       awards: req.body.awards || [],
       inspiration: req.body.inspiration || [],
       storeLinks: req.body.storeLinks || [],
+      crewList: req.body.crewList || [], // crewList eklendi
       languages: req.body.languages || { audio: [], subtitles: [], interface: [] },
       systemRequirements: req.body.systemRequirements || { minimum: "", recommended: "" },
     };
 
     const newGame = new Game(gameData);
     await newGame.save();
+    console.log("✅ New game created:", newGame.title);
     res.status(201).json(newGame);
   } catch (err) {
-    console.error("Game create error:", err); // Şu satır KESİNLİKLE olmalı!
+    console.error("❌ Game create error:", err);
     res.status(400).json({
       error: "Failed to add game",
       detail: err.message,
       fields: err.errors,
-      stack: err.stack,
     });
   }
 };
 
 exports.updateGame = async (req, res) => {
   try {
+    const gameId = req.params.id;
+
+    // MongoDB ObjectId formatını kontrol et
+    if (!mongoose.Types.ObjectId.isValid(gameId)) {
+      return res.status(400).json({ error: "Invalid game ID format" });
+    }
+
     const gameData = {
       ...req.body,
       tags: req.body.tags || [],
@@ -139,24 +201,51 @@ exports.updateGame = async (req, res) => {
       dlcs: req.body.dlcs || [],
       awards: req.body.awards || [],
       inspiration: req.body.inspiration || [],
-      storeLinks: req.body.storeLinks || [], 
+      storeLinks: req.body.storeLinks || [],
+      crewList: req.body.crewList || [], // crewList eklendi
       languages: req.body.languages || { audio: [], subtitles: [], interface: [] },
       systemRequirements: req.body.systemRequirements || { minimum: "", recommended: "" },
     };
 
-    const updatedGame = await Game.findByIdAndUpdate(req.params.id, gameData, { new: true });
-    console.log("✅ OYUN GÜNCELLENDİ:", updatedGame);
+    const updatedGame = await Game.findByIdAndUpdate(gameId, gameData, { new: true });
+
+    if (!updatedGame) {
+      return res.status(404).json({ error: "Game not found" });
+    }
+
+    console.log("✅ Game updated:", updatedGame.title);
     res.json(updatedGame);
   } catch (err) {
-    res.status(400).json({ error: "Failed to update game" });
+    console.error("❌ Game update error:", err);
+    res.status(400).json({
+      error: "Failed to update game",
+      details: err.message
+    });
   }
 };
 
 exports.deleteGame = async (req, res) => {
   try {
-    await Game.findByIdAndDelete(req.params.id);
-    res.json({ message: "Game deleted" });
+    const gameId = req.params.id;
+
+    // MongoDB ObjectId formatını kontrol et
+    if (!mongoose.Types.ObjectId.isValid(gameId)) {
+      return res.status(400).json({ error: "Invalid game ID format" });
+    }
+
+    const deletedGame = await Game.findByIdAndDelete(gameId);
+
+    if (!deletedGame) {
+      return res.status(404).json({ error: "Game not found" });
+    }
+
+    console.log("✅ Game deleted:", deletedGame.title);
+    res.json({ message: "Game deleted successfully" });
   } catch (err) {
-    res.status(500).json({ error: "Failed to delete game" });
+    console.error("❌ Game delete error:", err);
+    res.status(500).json({
+      error: "Failed to delete game",
+      details: err.message
+    });
   }
 };
