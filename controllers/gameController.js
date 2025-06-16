@@ -1,5 +1,80 @@
+// 📁 controllers/gameController.js - Enhanced with contributor duplicate detection
+
 const Game = require("../models/Game");
 const mongoose = require("mongoose");
+
+// 🆕 Helper function to check for duplicate contributors
+const checkForDuplicateContributors = (existingCrewList, newContributor) => {
+  if (!existingCrewList || !Array.isArray(existingCrewList)) {
+    return { isDuplicate: false, duplicateType: null, existingContributor: null };
+  }
+
+  for (const existing of existingCrewList) {
+    // Check for userId match (registered users)
+    if (existing.userId && newContributor.userId &&
+        existing.userId.toString() === newContributor.userId.toString()) {
+      return {
+        isDuplicate: true,
+        duplicateType: 'userId',
+        existingContributor: existing,
+        message: `This user is already a contributor with role: "${existing.role}"`
+      };
+    }
+
+    // Check for name match (case insensitive, for guest contributors)
+    if (!existing.userId && !newContributor.userId &&
+        existing.name && newContributor.name &&
+        existing.name.toLowerCase().trim() === newContributor.name.toLowerCase().trim()) {
+      return {
+        isDuplicate: true,
+        duplicateType: 'name',
+        existingContributor: existing,
+        message: `A contributor with name "${existing.name}" already exists with role: "${existing.role}"`
+      };
+    }
+  }
+
+  return { isDuplicate: false, duplicateType: null, existingContributor: null };
+};
+
+// 🆕 Helper function to validate and clean contributor data
+const validateContributorData = (contributor) => {
+  const errors = [];
+
+  if (!contributor.name || typeof contributor.name !== 'string' || !contributor.name.trim()) {
+    errors.push('Contributor name is required');
+  }
+
+  if (!contributor.role || typeof contributor.role !== 'string' || !contributor.role.trim()) {
+    errors.push('Contributor role is required');
+  }
+
+  if (contributor.name && contributor.name.length > 100) {
+    errors.push('Contributor name cannot exceed 100 characters');
+  }
+
+  if (contributor.role && contributor.role.length > 200) {
+    errors.push('Contributor role cannot exceed 200 characters');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    cleanData: {
+      id: contributor.id || Date.now().toString(),
+      name: contributor.name ? contributor.name.trim() : '',
+      role: contributor.role ? contributor.role.trim() : '',
+      image: contributor.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(contributor.name || 'User')}&background=random&color=fff&size=40`,
+      isRegisteredUser: Boolean(contributor.isRegisteredUser),
+      userId: contributor.userId || null,
+      department: contributor.department || null,
+      bio: contributor.bio || null,
+      socialLinks: contributor.socialLinks || [],
+      createdAt: contributor.createdAt || new Date(),
+      updatedAt: new Date()
+    }
+  };
+};
 
 exports.getAllGames = async (req, res) => {
   try {
@@ -166,6 +241,41 @@ exports.createGame = async (req, res) => {
       systemRequirements: req.body.systemRequirements || { minimum: "", recommended: "" },
     };
 
+    // 🆕 Validate contributors if provided
+    if (gameData.crewList && gameData.crewList.length > 0) {
+      const validationErrors = [];
+      const validatedCrewList = [];
+
+      for (let i = 0; i < gameData.crewList.length; i++) {
+        const contributor = gameData.crewList[i];
+
+        // Validate individual contributor
+        const validation = validateContributorData(contributor);
+        if (!validation.isValid) {
+          validationErrors.push(`Contributor ${i + 1}: ${validation.errors.join(', ')}`);
+          continue;
+        }
+
+        // Check for duplicates
+        const duplicateCheck = checkForDuplicateContributors(validatedCrewList, validation.cleanData);
+        if (duplicateCheck.isDuplicate) {
+          validationErrors.push(`Contributor ${i + 1}: ${duplicateCheck.message}`);
+          continue;
+        }
+
+        validatedCrewList.push(validation.cleanData);
+      }
+
+      if (validationErrors.length > 0) {
+        return res.status(400).json({
+          error: "Contributor validation failed",
+          details: validationErrors
+        });
+      }
+
+      gameData.crewList = validatedCrewList;
+    }
+
     const newGame = new Game(gameData);
     await newGame.save();
     console.log("✅ New game created:", newGame.title);
@@ -206,6 +316,41 @@ exports.updateGame = async (req, res) => {
       languages: req.body.languages || { audio: [], subtitles: [], interface: [] },
       systemRequirements: req.body.systemRequirements || { minimum: "", recommended: "" },
     };
+
+    // 🆕 Validate contributors if provided
+    if (gameData.crewList && gameData.crewList.length > 0) {
+      const validationErrors = [];
+      const validatedCrewList = [];
+
+      for (let i = 0; i < gameData.crewList.length; i++) {
+        const contributor = gameData.crewList[i];
+
+        // Validate individual contributor
+        const validation = validateContributorData(contributor);
+        if (!validation.isValid) {
+          validationErrors.push(`Contributor ${i + 1}: ${validation.errors.join(', ')}`);
+          continue;
+        }
+
+        // Check for duplicates
+        const duplicateCheck = checkForDuplicateContributors(validatedCrewList, validation.cleanData);
+        if (duplicateCheck.isDuplicate) {
+          validationErrors.push(`Contributor ${i + 1}: ${duplicateCheck.message}`);
+          continue;
+        }
+
+        validatedCrewList.push(validation.cleanData);
+      }
+
+      if (validationErrors.length > 0) {
+        return res.status(400).json({
+          error: "Contributor validation failed",
+          details: validationErrors
+        });
+      }
+
+      gameData.crewList = validatedCrewList;
+    }
 
     const updatedGame = await Game.findByIdAndUpdate(gameId, gameData, { new: true });
 

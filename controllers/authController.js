@@ -1,7 +1,8 @@
-// 📁 controllers/authController.js - Complete with all functions
+// 📁 controllers/authController.js - Complete with username change detection
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const User = require("../models/User");
+const Game = require("../models/Game");
 
 // ✅ EMAIL CHECK
 exports.checkEmail = async (req, res) => {
@@ -97,11 +98,84 @@ exports.getMe = async (req, res) => {
   }
 };
 
-// ✅ UPDATE ME - Enhanced with professional fields
+// 🆕 Helper function to update contributor names across all games
+const updateContributorNamesInGames = async (userId, oldUsername, newUsername) => {
+  try {
+    console.log(`🔄 Updating contributor names from "${oldUsername}" to "${newUsername}" for user ${userId}`);
+
+    // Find all games where this user is a contributor
+    const gamesWithUser = await Game.find({
+      "crewList.userId": userId
+    });
+
+    console.log(`📊 Found ${gamesWithUser.length} games where user is a contributor`);
+
+    if (gamesWithUser.length === 0) {
+      console.log("✅ No games found with this user as contributor, skipping update");
+      return { updatedGames: 0, gamesList: [] };
+    }
+
+    let updatedCount = 0;
+    const updatedGamesList = [];
+
+    // Update each game individually for better control and logging
+    for (const game of gamesWithUser) {
+      let gameUpdated = false;
+
+      // Update crewList entries for this user
+      if (game.crewList && Array.isArray(game.crewList)) {
+        game.crewList.forEach(crew => {
+          if (crew.userId && crew.userId.toString() === userId.toString()) {
+            if (crew.name !== newUsername) {
+              console.log(`  🎮 Game "${game.title}": Updating "${crew.name}" → "${newUsername}"`);
+              crew.name = newUsername;
+              crew.updatedAt = new Date();
+              gameUpdated = true;
+            }
+          }
+        });
+      }
+
+      // Save if updated
+      if (gameUpdated) {
+        await game.save();
+        updatedCount++;
+        updatedGamesList.push({
+          id: game._id,
+          title: game.title
+        });
+      }
+    }
+
+    console.log(`✅ Updated contributor names in ${updatedCount} games`);
+
+    return {
+      updatedGames: updatedCount,
+      gamesList: updatedGamesList
+    };
+
+  } catch (error) {
+    console.error("❌ Error updating contributor names in games:", error);
+    throw error;
+  }
+};
+
+// ✅ UPDATE ME - Enhanced with username change detection and contributor update
 exports.updateMe = async (req, res) => {
   try {
     console.log("🔄 updateMe incoming updates:", req.body);
     console.log("🔍 User ID from token:", req.user.id);
+
+    // Get current user data for comparison
+    const currentUser = await User.findById(req.user.id);
+    if (!currentUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Detect username change
+    const isUsernameChanged = req.body.username && req.body.username !== currentUser.username;
+    const oldUsername = currentUser.username;
+    const newUsername = req.body.username;
 
     // Sadece modelde olan alanlara izin ver (güvenlik) - yeni alanlar eklendi
     const allowedFields = [
@@ -439,6 +513,24 @@ exports.updateMe = async (req, res) => {
 
     console.log("🔄 Processed updates:", Object.keys(updates));
 
+    // Username change validation
+    if (isUsernameChanged) {
+      console.log(`📝 Username change detected: "${oldUsername}" → "${newUsername}"`);
+
+      // Check if new username is already taken by another user
+      const existingUser = await User.findOne({
+        username: newUsername,
+        _id: { $ne: req.user.id }
+      });
+
+      if (existingUser) {
+        return res.status(400).json({
+          message: "Username is already taken by another user",
+          field: "username"
+        });
+      }
+    }
+
     // Kullanıcıyı güncelle
     const user = await User.findByIdAndUpdate(
         req.user.id,
@@ -453,6 +545,28 @@ exports.updateMe = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // 🆕 UPDATE CONTRIBUTOR NAMES IN GAMES IF USERNAME CHANGED
+    let contributorUpdateResult = null;
+    if (isUsernameChanged) {
+      try {
+        contributorUpdateResult = await updateContributorNamesInGames(
+            req.user.id,
+            oldUsername,
+            newUsername
+        );
+
+        console.log(`✅ Contributor update completed:`, contributorUpdateResult);
+      } catch (error) {
+        console.error("❌ Failed to update contributor names, but user profile was updated:", error);
+        // Don't fail the whole request, just log the error
+        contributorUpdateResult = {
+          error: "Failed to update contributor names in some games",
+          updatedGames: 0,
+          gamesList: []
+        };
+      }
+    }
+
     console.log("✅ User successfully updated:", {
       id: user._id,
       username: user.username,
@@ -463,15 +577,35 @@ exports.updateMe = async (req, res) => {
       hasEducation: !!user.education,
       hasCurrentWork: !!user.currentWork,
       hasCurrentProjects: !!user.currentProjects,
-      hasCareerGoals: !!user.careerGoals
+      hasCareerGoals: !!user.careerGoals,
+      usernameChanged: isUsernameChanged,
+      contributorGamesUpdated: contributorUpdateResult?.updatedGames || 0
     });
 
-    // Başarılı response
-    res.json({
+    // Enhanced response with contributor update info
+    const response = {
       message: "Profile updated successfully",
       user: user,
       updatedFields: Object.keys(updates)
-    });
+    };
+
+    // Add contributor update info if username was changed
+    if (isUsernameChanged && contributorUpdateResult) {
+      response.contributorUpdate = {
+        updated: contributorUpdateResult.updatedGames > 0,
+        gamesCount: contributorUpdateResult.updatedGames,
+        gamesList: contributorUpdateResult.gamesList,
+        error: contributorUpdateResult.error || null
+      };
+
+      if (contributorUpdateResult.updatedGames > 0) {
+        response.message = `Profile updated successfully! Your contributor name has been updated in ${contributorUpdateResult.updatedGames} game(s).`;
+      } else if (contributorUpdateResult.error) {
+        response.message = "Profile updated successfully, but there was an issue updating your contributor credits. Please contact support if this persists.";
+      }
+    }
+
+    res.json(response);
 
   } catch (err) {
     console.error("❌ updateMe error:", err);
