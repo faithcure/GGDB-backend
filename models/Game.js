@@ -40,16 +40,16 @@ const GameSchema = new mongoose.Schema({
     }
   ],
   bannerOverrides: {
-    posterImage: String,   // Admin panelinden değiştirilen poster url'si
-    trailerUrl: String,    // Admin panelinden değiştirilen trailer/video url'si
+    posterImage: String,
+    trailerUrl: String,
   },
   languages: {
     audio: [String],
     subtitles: [String],
     interface: [String],
   },
-  ggdbRating: { type: Number, default: 0 },    // ⭐️ GGDB puan ortalaması
-  ratingCount: { type: Number, default: 0 },   // (opsiyonel) Toplam oy sayısı
+  ggdbRating: { type: Number, default: 0 },
+  ratingCount: { type: Number, default: 0 },
   storeLinks: [
     {
       platform: String,
@@ -62,7 +62,8 @@ const GameSchema = new mongoose.Schema({
     }
   ],
   crew: [String],
-  // 🆕 ENHANCED: Structured crew list with detailed information
+
+  // 🆕 ENHANCED: Structured crew list with roles array
   crewList: [
     {
       id: {
@@ -71,9 +72,21 @@ const GameSchema = new mongoose.Schema({
         default: function() {
           return Date.now().toString();
         }
-      }, // Unique identifier for frontend operations
+      },
       name: { type: String, required: true },
-      role: { type: String, required: true },
+
+      // 🆕 NEW STRUCTURE: Multiple roles with departments
+      roles: [
+        {
+          name: { type: String, required: true },        // e.g., "VFX Artist"
+          department: { type: String, required: true }   // e.g., "Art"
+        }
+      ],
+
+      // 🔧 DEPRECATED: Keep for backward compatibility during migration
+      role: String,          // Will be removed after migration
+      department: String,    // Will be removed after migration
+
       image: {
         type: String,
         default: function() {
@@ -85,18 +98,16 @@ const GameSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: false
-      }, // Link to actual user if registered
-      bio: String, // Optional biography
+      },
+      bio: String,
       socialLinks: [
         {
           platform: String,
           url: String
         }
       ],
-      // 🆕 Additional fields for better contributor management
-      department: String, // e.g., "Programming", "Art", "Design"
-      credits: [String], // Additional game credits
-      verified: { type: Boolean, default: false }, // Admin verified contributor
+      credits: [String],
+      verified: { type: Boolean, default: false },
       visibility: {
         type: String,
         enum: ["public", "private", "contributors_only"],
@@ -106,7 +117,7 @@ const GameSchema = new mongoose.Schema({
       updatedAt: { type: Date, default: Date.now }
     }
   ],
-  // 🆕 NEW: Reviews system
+
   reviews: [
     {
       user: { type: String, required: true },
@@ -122,7 +133,7 @@ const GameSchema = new mongoose.Schema({
         max: 5
       },
       spoiler: { type: Boolean, default: false },
-      helpful: { type: Number, default: 0 }, // Helpful votes
+      helpful: { type: Number, default: 0 },
       date: { type: Date, default: Date.now }
     }
   ],
@@ -139,7 +150,6 @@ const GameSchema = new mongoose.Schema({
   mainPlaytime: Number,
   extrasPlaytime: Number,
   completionPlaytime: Number,
-  //playtime: Number,
   steamLink: String,
   website: String,
   price: Number,
@@ -151,7 +161,6 @@ const GameSchema = new mongoose.Schema({
     minimum: String,
     recommended: String,
   },
-  // 🆕 Metadata for better crew management
   crewMetadata: {
     lastUpdated: { type: Date, default: Date.now },
     lastUpdatedBy: {
@@ -163,14 +172,14 @@ const GameSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// 🆕 Index for better performance
+// 🆕 Indexes for better performance
 GameSchema.index({ title: 1 });
 GameSchema.index({ genres: 1 });
 GameSchema.index({ ggdbRating: -1 });
 GameSchema.index({ "crewList.name": 1 });
 GameSchema.index({ "crewList.userId": 1 });
-GameSchema.index({ "crewList.role": 1 });
-GameSchema.index({ "crewList.department": 1 });
+GameSchema.index({ "crewList.roles.name": 1 });
+GameSchema.index({ "crewList.roles.department": 1 });
 
 // 🆕 Virtual for total crew count
 GameSchema.virtual('totalCrewCount').get(function() {
@@ -186,25 +195,40 @@ GameSchema.virtual('registeredCrewCount').get(function() {
 GameSchema.virtual('averageReviewRating').get(function() {
   if (!this.reviews || this.reviews.length === 0) return 0;
   const sum = this.reviews.reduce((acc, review) => acc + review.rating, 0);
-  return Math.round((sum / this.reviews.length) * 10) / 10; // Round to 1 decimal
+  return Math.round((sum / this.reviews.length) * 10) / 10;
 });
 
 // 🆕 Virtual for crew by department
 GameSchema.virtual('crewByDepartment').get(function() {
   if (!this.crewList) return {};
 
-  return this.crewList.reduce((acc, crew) => {
-    const dept = crew.department || 'Other';
-    if (!acc[dept]) acc[dept] = [];
-    acc[dept].push(crew);
-    return acc;
-  }, {});
+  const result = {};
+  this.crewList.forEach(crew => {
+    if (crew.roles && crew.roles.length > 0) {
+      // 🆕 NEW: Use roles array
+      crew.roles.forEach(role => {
+        const dept = role.department || 'Other';
+        if (!result[dept]) result[dept] = [];
+        result[dept].push({
+          ...crew.toObject(),
+          currentRole: role.name,
+          currentDepartment: role.department
+        });
+      });
+    } else {
+      // 🔧 BACKWARD COMPATIBILITY: Use old role/department
+      const dept = crew.department || 'Other';
+      if (!result[dept]) result[dept] = [];
+      result[dept].push(crew);
+    }
+  });
+
+  return result;
 });
 
 // 🆕 Pre-save middleware to update crewList timestamps and metadata
 GameSchema.pre('save', function(next) {
   if (this.isModified('crewList')) {
-    // Update individual crew timestamps
     this.crewList.forEach(crew => {
       if (!crew.createdAt) crew.createdAt = new Date();
       if (!crew.id) crew.id = Date.now().toString();
@@ -213,6 +237,20 @@ GameSchema.pre('save', function(next) {
       // Set default image if none provided
       if (!crew.image && crew.name) {
         crew.image = `https://ui-avatars.com/api/?name=${encodeURIComponent(crew.name)}&background=random&color=fff&size=40`;
+      }
+
+      // 🆕 Ensure roles array exists
+      if (!crew.roles || !Array.isArray(crew.roles)) {
+        crew.roles = [];
+      }
+
+      // 🔧 MIGRATION: Convert old role/department to new structure
+      if (crew.role && crew.department && crew.roles.length === 0) {
+        const roles = crew.role.split(' & ').map(r => r.trim());
+        crew.roles = roles.map(roleName => ({
+          name: roleName,
+          department: crew.department
+        }));
       }
     });
 
@@ -227,16 +265,15 @@ GameSchema.pre('save', function(next) {
   next();
 });
 
-// 🆕 Instance method to add contributor
+// 🆕 Instance method to add contributor with roles
 GameSchema.methods.addContributor = function(contributorData, userId = null) {
   const newContributor = {
     id: Date.now().toString(),
     name: contributorData.name,
-    role: contributorData.role,
+    roles: contributorData.roles || [],  // 🆕 Roles array
     image: contributorData.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(contributorData.name)}&background=random&color=fff&size=40`,
     isRegisteredUser: contributorData.isRegisteredUser || false,
     userId: contributorData.userId || null,
-    department: contributorData.department || null,
     bio: contributorData.bio || null,
     socialLinks: contributorData.socialLinks || [],
     createdAt: new Date(),
@@ -260,7 +297,6 @@ GameSchema.methods.removeContributor = function(contributorId, userId = null) {
   this.crewList = this.crewList.filter(crew => crew.id !== contributorId);
 
   if (this.crewList.length < initialLength) {
-    // Update metadata
     this.crewMetadata.lastUpdated = new Date();
     this.crewMetadata.lastUpdatedBy = userId;
     this.crewMetadata.contributorCount = this.crewList.length;
@@ -281,6 +317,26 @@ GameSchema.statics.findByContributor = function(contributorName) {
 GameSchema.statics.findByUserId = function(userId) {
   return this.find({
     "crewList.userId": userId
+  });
+};
+
+// 🆕 Static method to find games by role
+GameSchema.statics.findByRole = function(roleName) {
+  return this.find({
+    $or: [
+      { "crewList.roles.name": new RegExp(roleName, 'i') },
+      { "crewList.role": new RegExp(roleName, 'i') }  // Backward compatibility
+    ]
+  });
+};
+
+// 🆕 Static method to find games by department
+GameSchema.statics.findByDepartment = function(departmentName) {
+  return this.find({
+    $or: [
+      { "crewList.roles.department": new RegExp(departmentName, 'i') },
+      { "crewList.department": new RegExp(departmentName, 'i') }  // Backward compatibility
+    ]
   });
 };
 

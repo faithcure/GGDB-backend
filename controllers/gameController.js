@@ -1,9 +1,9 @@
-// 📁 controllers/gameController.js - Enhanced with contributor duplicate detection
+// 📁 controllers/gameController.js - Enhanced with roles array support
 
 const Game = require("../models/Game");
 const mongoose = require("mongoose");
 
-// 🆕 Helper function to check for duplicate contributors
+// 🆕 Helper function to check for duplicate contributors (updated for roles array)
 const checkForDuplicateContributors = (existingCrewList, newContributor) => {
   if (!existingCrewList || !Array.isArray(existingCrewList)) {
     return { isDuplicate: false, duplicateType: null, existingContributor: null };
@@ -17,7 +17,7 @@ const checkForDuplicateContributors = (existingCrewList, newContributor) => {
         isDuplicate: true,
         duplicateType: 'userId',
         existingContributor: existing,
-        message: `This user is already a contributor with role: "${existing.role}"`
+        message: `This user is already a contributor`
       };
     }
 
@@ -29,7 +29,7 @@ const checkForDuplicateContributors = (existingCrewList, newContributor) => {
         isDuplicate: true,
         duplicateType: 'name',
         existingContributor: existing,
-        message: `A contributor with name "${existing.name}" already exists with role: "${existing.role}"`
+        message: `A contributor with name "${existing.name}" already exists`
       };
     }
   }
@@ -37,7 +37,7 @@ const checkForDuplicateContributors = (existingCrewList, newContributor) => {
   return { isDuplicate: false, duplicateType: null, existingContributor: null };
 };
 
-// 🆕 Helper function to validate and clean contributor data
+// 🆕 Helper function to validate and clean contributor data (updated for roles array)
 const validateContributorData = (contributor) => {
   const errors = [];
 
@@ -45,16 +45,41 @@ const validateContributorData = (contributor) => {
     errors.push('Contributor name is required');
   }
 
-  if (!contributor.role || typeof contributor.role !== 'string' || !contributor.role.trim()) {
-    errors.push('Contributor role is required');
+  // 🆕 Validate roles array
+  if (!contributor.roles || !Array.isArray(contributor.roles) || contributor.roles.length === 0) {
+    errors.push('At least one role is required');
+  } else {
+    contributor.roles.forEach((role, index) => {
+      if (!role.name || typeof role.name !== 'string' || !role.name.trim()) {
+        errors.push(`Role ${index + 1}: Role name is required`);
+      }
+      if (!role.department || typeof role.department !== 'string' || !role.department.trim()) {
+        errors.push(`Role ${index + 1}: Department is required`);
+      }
+      if (role.name && role.name.length > 100) {
+        errors.push(`Role ${index + 1}: Role name cannot exceed 100 characters`);
+      }
+    });
   }
 
   if (contributor.name && contributor.name.length > 100) {
     errors.push('Contributor name cannot exceed 100 characters');
   }
 
-  if (contributor.role && contributor.role.length > 200) {
-    errors.push('Contributor role cannot exceed 200 characters');
+  // 🔧 BACKWARD COMPATIBILITY: Handle old role/department format
+  let cleanRoles = [];
+  if (contributor.roles && Array.isArray(contributor.roles)) {
+    cleanRoles = contributor.roles.map(role => ({
+      name: role.name ? role.name.trim() : '',
+      department: role.department ? role.department.trim() : ''
+    })).filter(role => role.name && role.department);
+  } else if (contributor.role && contributor.department) {
+    // Convert old format to new format
+    const roles = contributor.role.split(' & ').map(r => r.trim());
+    cleanRoles = roles.map(roleName => ({
+      name: roleName,
+      department: contributor.department.trim()
+    }));
   }
 
   return {
@@ -63,11 +88,10 @@ const validateContributorData = (contributor) => {
     cleanData: {
       id: contributor.id || Date.now().toString(),
       name: contributor.name ? contributor.name.trim() : '',
-      role: contributor.role ? contributor.role.trim() : '',
+      roles: cleanRoles,
       image: contributor.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(contributor.name || 'User')}&background=random&color=fff&size=40`,
       isRegisteredUser: Boolean(contributor.isRegisteredUser),
       userId: contributor.userId || null,
-      department: contributor.department || null,
       bio: contributor.bio || null,
       socialLinks: contributor.socialLinks || [],
       createdAt: contributor.createdAt || new Date(),
@@ -76,20 +100,58 @@ const validateContributorData = (contributor) => {
   };
 };
 
+// 🆕 Helper function to format contributor for response (backward compatibility)
+const formatContributorForResponse = (contributor) => {
+  const formatted = {
+    id: contributor.id,
+    name: contributor.name,
+    image: contributor.image,
+    isRegisteredUser: contributor.isRegisteredUser,
+    userId: contributor.userId,
+    bio: contributor.bio,
+    socialLinks: contributor.socialLinks,
+    createdAt: contributor.createdAt,
+    updatedAt: contributor.updatedAt
+  };
+
+  // 🆕 NEW FORMAT: Include roles array
+  if (contributor.roles && contributor.roles.length > 0) {
+    formatted.roles = contributor.roles;
+    // Also provide legacy format for backward compatibility
+    formatted.role = contributor.roles.map(r => r.name).join(' & ');
+    formatted.department = contributor.roles[0].department; // Primary department
+  } else {
+    // 🔧 FALLBACK: Old format
+    formatted.role = contributor.role || '';
+    formatted.department = contributor.department || '';
+    formatted.roles = contributor.role ? [{
+      name: contributor.role,
+      department: contributor.department || 'Other'
+    }] : [];
+  }
+
+  return formatted;
+};
+
 exports.getAllGames = async (req, res) => {
   try {
     const games = await Game.find();
-    res.json(games);
+
+    // 🆕 Format crewList for response
+    const formattedGames = games.map(game => ({
+      ...game.toObject(),
+      crewList: game.crewList.map(formatContributorForResponse)
+    }));
+
+    res.json(formattedGames);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch games" });
   }
 };
 
-// Tüm reviewları getir
 exports.getGameReviews = async (req, res) => {
   const gameId = req.params.id;
 
-  // MongoDB ObjectId formatını kontrol et
   if (!mongoose.Types.ObjectId.isValid(gameId)) {
     return res.status(400).json({ error: "Invalid game ID format" });
   }
@@ -104,12 +166,10 @@ exports.getGameReviews = async (req, res) => {
   }
 };
 
-// Yeni review ekle
 exports.addGameReview = async (req, res) => {
   const gameId = req.params.id;
   const { user, comment, rating, spoiler } = req.body;
 
-  // MongoDB ObjectId formatını kontrol et
   if (!mongoose.Types.ObjectId.isValid(gameId)) {
     return res.status(400).json({ error: "Invalid game ID format" });
   }
@@ -118,7 +178,6 @@ exports.addGameReview = async (req, res) => {
     const game = await Game.findById(gameId);
     if (!game) return res.status(404).json({ error: "Game not found" });
 
-    // Basitçe reviews arrayine ekle
     if (!game.reviews) game.reviews = [];
     game.reviews.push({
       user, comment, rating, spoiler, date: new Date()
@@ -135,18 +194,13 @@ exports.getGameById = async (req, res) => {
   try {
     const gameId = req.params.id;
 
-    // Debug log'ları ekle
     console.log("🔍 Received Game ID:", gameId);
-    console.log("🔍 ID Type:", typeof gameId);
-    console.log("🔍 Request params:", req.params);
 
-    // ID boş mu kontrol et
     if (!gameId) {
       console.error("❌ Game ID is missing");
       return res.status(400).json({ error: "Game ID is required" });
     }
 
-    // MongoDB ObjectId formatını kontrol et
     if (!mongoose.Types.ObjectId.isValid(gameId)) {
       console.error("❌ Invalid MongoDB ObjectId format:", gameId);
       return res.status(400).json({ error: "Invalid game ID format" });
@@ -160,8 +214,14 @@ exports.getGameById = async (req, res) => {
       return res.status(404).json({ error: "Game not found" });
     }
 
+    // 🆕 Format crewList for response
+    const formattedGame = {
+      ...game.toObject(),
+      crewList: game.crewList.map(formatContributorForResponse)
+    };
+
     console.log("✅ Game found:", game.title);
-    res.json(game);
+    res.json(formattedGame);
   } catch (err) {
     console.error("❌ Database error:", err);
     res.status(500).json({
@@ -174,7 +234,6 @@ exports.getGameById = async (req, res) => {
 exports.getSimilarGames = async (req, res) => {
   const gameId = req.params.id;
 
-  // MongoDB ObjectId formatını kontrol et
   if (!mongoose.Types.ObjectId.isValid(gameId)) {
     return res.status(400).json({ error: "Invalid game ID format" });
   }
@@ -236,7 +295,7 @@ exports.createGame = async (req, res) => {
       awards: req.body.awards || [],
       inspiration: req.body.inspiration || [],
       storeLinks: req.body.storeLinks || [],
-      crewList: req.body.crewList || [], // crewList eklendi
+      crewList: req.body.crewList || [],
       languages: req.body.languages || { audio: [], subtitles: [], interface: [] },
       systemRequirements: req.body.systemRequirements || { minimum: "", recommended: "" },
     };
@@ -278,8 +337,15 @@ exports.createGame = async (req, res) => {
 
     const newGame = new Game(gameData);
     await newGame.save();
+
+    // 🆕 Format response
+    const formattedGame = {
+      ...newGame.toObject(),
+      crewList: newGame.crewList.map(formatContributorForResponse)
+    };
+
     console.log("✅ New game created:", newGame.title);
-    res.status(201).json(newGame);
+    res.status(201).json(formattedGame);
   } catch (err) {
     console.error("❌ Game create error:", err);
     res.status(400).json({
@@ -294,7 +360,6 @@ exports.updateGame = async (req, res) => {
   try {
     const gameId = req.params.id;
 
-    // MongoDB ObjectId formatını kontrol et
     if (!mongoose.Types.ObjectId.isValid(gameId)) {
       return res.status(400).json({ error: "Invalid game ID format" });
     }
@@ -312,7 +377,7 @@ exports.updateGame = async (req, res) => {
       awards: req.body.awards || [],
       inspiration: req.body.inspiration || [],
       storeLinks: req.body.storeLinks || [],
-      crewList: req.body.crewList || [], // crewList eklendi
+      crewList: req.body.crewList || [],
       languages: req.body.languages || { audio: [], subtitles: [], interface: [] },
       systemRequirements: req.body.systemRequirements || { minimum: "", recommended: "" },
     };
@@ -358,8 +423,14 @@ exports.updateGame = async (req, res) => {
       return res.status(404).json({ error: "Game not found" });
     }
 
+    // 🆕 Format response
+    const formattedGame = {
+      ...updatedGame.toObject(),
+      crewList: updatedGame.crewList.map(formatContributorForResponse)
+    };
+
     console.log("✅ Game updated:", updatedGame.title);
-    res.json(updatedGame);
+    res.json(formattedGame);
   } catch (err) {
     console.error("❌ Game update error:", err);
     res.status(400).json({
@@ -373,7 +444,6 @@ exports.deleteGame = async (req, res) => {
   try {
     const gameId = req.params.id;
 
-    // MongoDB ObjectId formatını kontrol et
     if (!mongoose.Types.ObjectId.isValid(gameId)) {
       return res.status(400).json({ error: "Invalid game ID format" });
     }

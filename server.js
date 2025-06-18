@@ -10,6 +10,8 @@ const authRoutes = require("./routes/authRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const ratingRoutes = require("./routes/ratingRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
+const userRoutes = require("./routes/userRoutes"); // ← BU SATIRI EKLE
+
 const app = express();
 
 // ✅ CORS — sadece izinli origin'lere açık
@@ -40,11 +42,13 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/ratings", ratingRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/user-activity", userActivityRoutes);
-// MongoDB Connection 
+app.use("/api/users", userRoutes); // ← BU SATIRI EKLE
+
+// MongoDB Connection
 mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch((err) => console.error("❌ MongoDB connection error:", err));
+    .connect(process.env.MONGO_URI)
+    .then(() => console.log("✅ MongoDB connected"))
+    .catch((err) => console.error("❌ MongoDB connection error:", err));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

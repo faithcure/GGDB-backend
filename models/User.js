@@ -185,6 +185,8 @@ userSchema.pre('save', function(next) {
   next();
 });
 
+
+
 // Index'ler
 userSchema.index({ email: 1 });
 userSchema.index({ username: 1 });

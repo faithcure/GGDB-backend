@@ -59,6 +59,7 @@ router.put("/:id/contributors", authMiddleware, async (req, res) => {
     const validatedCrewList = crewList.map(crew => ({
       id: crew.id || Date.now().toString(),
       name: crew.name || "",
+      department: crew.department || "",
       role: crew.role || "",
       image: crew.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(crew.name)}&background=random&color=fff&size=40`,
       isRegisteredUser: crew.isRegisteredUser || false,
