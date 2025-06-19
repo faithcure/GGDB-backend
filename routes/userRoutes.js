@@ -3,6 +3,26 @@ const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
 const Game = require("../models/Game");
+const User = require("../models/User");
+
+// 🆕 Public user profile by slug
+router.get("/by-slug/:slug", async (req, res) => {
+    try {
+        const slug = req.params.slug;
+        const user = await User.findOne({
+            username: new RegExp(`^${slug.replace(/-/g, " ")}`, "i"),
+            deleted: { $ne: true },
+            banned: { $ne: true }
+        }).select("-password");
+
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        res.json(user);
+    } catch (error) {
+        console.error("User fetch by slug error:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+});
 
 // 🆕 Helper function to extract user roles from game contributions
 const extractUserRolesFromGame = (game, userId) => {
