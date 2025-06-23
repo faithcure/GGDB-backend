@@ -21,7 +21,94 @@ exports.toggleLike = async (req, res) => {
     res.status(500).json({ error: "Failed to toggle like" });
   }
 };
+// userActivityController.js dosyasına eklenecek fonksiyonlar
 
+// Oyun için liked sayısı
+exports.getLikedCount = async (req, res) => {
+  try {
+    const { gameId } = req.params;
+    const count = await UserActivity.countDocuments({
+      gameId,
+      activityType: "like"
+    });
+    res.json({ count });
+  } catch (err) {
+    console.error("Failed to get liked count:", err);
+    res.status(500).json({ error: "Failed to get liked count" });
+  }
+};
+
+// Oyun için disliked sayısı
+exports.getDislikedCount = async (req, res) => {
+  try {
+    const { gameId } = req.params;
+    const count = await UserActivity.countDocuments({
+      gameId,
+      activityType: "dislike"
+    });
+    res.json({ count });
+  } catch (err) {
+    console.error("Failed to get disliked count:", err);
+    res.status(500).json({ error: "Failed to get disliked count" });
+  }
+};
+
+// Oyun için plan to play sayısı
+exports.getPlanToPlayCount = async (req, res) => {
+  try {
+    const { gameId } = req.params;
+    const count = await UserActivity.countDocuments({
+      gameId,
+      activityType: "plantoplay"
+    });
+    res.json({ count });
+  } catch (err) {
+    console.error("Failed to get plan to play count:", err);
+    res.status(500).json({ error: "Failed to get plan to play count" });
+  }
+};
+
+// Oyun için completed sayısı (progress >= 100 olanlar)
+exports.getCompletedCount = async (req, res) => {
+  try {
+    const { gameId } = req.params;
+    const count = await UserActivity.countDocuments({
+      gameId,
+      activityType: "progress",
+      progress: { $gte: 100 }
+    });
+    res.json({ count });
+  } catch (err) {
+    console.error("Failed to get completed count:", err);
+    res.status(500).json({ error: "Failed to get completed count" });
+  }
+};
+
+// Tüm istatistikleri tek seferde getiren optimized version
+exports.getGameStats = async (req, res) => {
+  try {
+    const { gameId } = req.params;
+
+    // Paralel olarak tüm istatistikleri çek
+    const [likedCount, dislikedCount, planToPlayCount, completedCount] = await Promise.all([
+      UserActivity.countDocuments({ gameId, activityType: "like" }),
+      UserActivity.countDocuments({ gameId, activityType: "dislike" }),
+      UserActivity.countDocuments({ gameId, activityType: "plantoplay" }),
+      UserActivity.countDocuments({ gameId, activityType: "progress", progress: { $gte: 100 } })
+    ]);
+
+    res.json({
+      liked: likedCount,
+      disliked: dislikedCount,
+      planToPlay: planToPlayCount,
+      completed: completedCount,
+      total: likedCount + dislikedCount + planToPlayCount + completedCount
+    });
+  } catch (err) {
+    console.error("Failed to get game stats:", err);
+    res.status(500).json({ error: "Failed to get game stats" });
+  }
+};
 // Dislike ekle/çıkar (toggle)
 exports.toggleDislike = async (req, res) => {
   const userId = req.user.id;
