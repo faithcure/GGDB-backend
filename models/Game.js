@@ -70,7 +70,11 @@ const GameSchema = new mongoose.Schema({
     audio: [String],
     subtitles: [String],
     interface: [String],
+    hasIGDBLanguageData: { type: Boolean, default: false },
+    lastChecked: { type: Date },
+    igdbGameId: { type: Number }
   },
+
   ggdbRating: { type: Number, default: 0 },
   ratingCount: { type: Number, default: 0 },
   storeLinks: [
