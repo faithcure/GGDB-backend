@@ -82,6 +82,26 @@ exports.submitRating = async (req, res) => {
   }
 };
 
+// Kullanıcının tüm puanları
+exports.getUserRatings = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const ratings = await Rating.find({ userId })
+      .sort({ updatedAt: -1 })
+      .limit(50);
+
+    if (!ratings.length) {
+      return res.status(404).json({ message: "No ratings found for this user" });
+    }
+
+    res.json(ratings);
+  } catch (err) {
+    console.error("Get user ratings error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 // Ortalama puan
 exports.getAverageRating = async (req, res) => {
   try {

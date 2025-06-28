@@ -11,7 +11,9 @@ const {
   getGameReviews,
   addGameReview,
   getSimilarGames,
-  getTopRatedGames
+  getTopRatedGames,
+  searchGames,
+  searchPeople
 } = require("../controllers/gameController");
 const { authMiddleware } = require("../middleware/authMiddleware");
 const Game = require("../models/Game");
@@ -21,6 +23,12 @@ const Game = require("../models/Game");
 
 // GET top rated games - MUST be before /:id routes
 router.get("/top/rated", getTopRatedGames);
+
+// 🆕 Search games - MUST be before /:id routes
+router.get("/search", searchGames);
+
+// 🆕 Search people in games - MUST be before /:id routes  
+router.get("/search/people", searchPeople);
 
 // GET all games
 router.get("/", getAllGames);

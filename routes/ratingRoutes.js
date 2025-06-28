@@ -4,10 +4,12 @@ const { authMiddleware } = require("../middleware/authMiddleware");
 const {
   getUserRating,
   submitRating,
-  getAverageRating
+  getAverageRating,
+  getUserRatings
 } = require("../controllers/ratingController");
 
 router.get("/avg/:gameId", getAverageRating);
+router.get("/user/:userId", authMiddleware, getUserRatings);
 router.get("/:gameId", authMiddleware, getUserRating);
 router.post("/:gameId", authMiddleware, submitRating);
 

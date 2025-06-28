@@ -464,3 +464,146 @@ exports.deleteGame = async (req, res) => {
     });
   }
 };
+
+// 🆕 Search games functionality - IMDB style
+exports.searchGames = async (req, res) => {
+  try {
+    const { q: query, limit = 10 } = req.query;
+
+    if (!query || query.trim().length < 2) {
+      return res.status(400).json({ 
+        error: "Search query must be at least 2 characters long" 
+      });
+    }
+
+    const searchRegex = new RegExp(query.trim(), 'i');
+    const limitNum = Math.min(parseInt(limit) || 10, 50); // Max 50 results
+
+    // Search in multiple fields: title, developer, publisher, genres
+    const searchQuery = {
+      $or: [
+        { title: { $regex: searchRegex } },
+        { developer: { $regex: searchRegex } },
+        { publisher: { $regex: searchRegex } },
+        { genres: { $in: [searchRegex] } },
+        { platforms: { $in: [searchRegex] } }
+      ]
+    };
+
+    const games = await Game.find(searchQuery)
+      .select('title coverImage releaseDate developer publisher genres platforms averageRating description gallery videos screenshots')
+      .sort({ averageRating: -1, releaseDate: -1 }) // Sort by rating then release date
+      .limit(limitNum)
+      .lean();
+
+    // Format results for frontend
+    const formattedResults = games.map((game, index) => ({
+      _id: game._id,
+      title: game.title,
+      coverImage: game.coverImage || '/placeholder-game.jpg',
+      releaseYear: game.releaseDate ? new Date(game.releaseDate).getFullYear() : null,
+      developer: game.developer || 'Unknown Developer',
+      publisher: game.publisher || game.developer || 'Unknown Publisher',
+      genres: Array.isArray(game.genres) ? game.genres.slice(0, 3) : [], // Max 3 genres
+      platforms: Array.isArray(game.platforms) ? game.platforms.slice(0, 4) : [], // Max 4 platforms
+      averageRating: game.averageRating || 0,
+      description: game.description ? game.description.substring(0, 150) + '...' : '',
+      // Enhanced data for first result
+      ...(index === 0 && {
+        gallery: Array.isArray(game.gallery) ? game.gallery.slice(0, 4) : [],
+        videos: Array.isArray(game.videos) ? game.videos.slice(0, 2) : [],
+        screenshots: Array.isArray(game.screenshots) ? game.screenshots.slice(0, 3) : [],
+        fullDescription: game.description || ''
+      })
+    }));
+
+    console.log(`🔍 Search: "${query}" - ${formattedResults.length} results found`);
+    
+    res.json({
+      query: query.trim(),
+      results: formattedResults,
+      totalFound: formattedResults.length,
+      hasMore: formattedResults.length === limitNum
+    });
+
+  } catch (err) {
+    console.error("❌ Game search error:", err);
+    res.status(500).json({
+      error: "Failed to search games",
+      details: err.message
+    });
+  }
+};
+
+// 🆕 Search people in game contributors
+exports.searchPeople = async (req, res) => {
+  try {
+    const { q: query, limit = 10 } = req.query;
+
+    if (!query || query.trim().length < 2) {
+      return res.status(400).json({ 
+        error: "Search query must be at least 2 characters long" 
+      });
+    }
+
+    const searchRegex = new RegExp(query.trim(), 'i');
+    const limitNum = Math.min(parseInt(limit) || 10, 50);
+
+    // Search in game contributors
+    const games = await Game.find({
+      'crewList.name': { $regex: searchRegex }
+    })
+    .select('title coverImage crewList')
+    .limit(limitNum * 2) // Get more games to extract people
+    .lean();
+
+    // Extract unique people from crews
+    const peopleMap = new Map();
+    
+    games.forEach(game => {
+      if (game.crewList && Array.isArray(game.crewList)) {
+        game.crewList.forEach(person => {
+          if (person.name && searchRegex.test(person.name)) {
+            const key = person.userId || person.name.toLowerCase();
+            if (!peopleMap.has(key)) {
+              peopleMap.set(key, {
+                _id: person.userId || person.id,
+                name: person.name,
+                department: person.department || 'Unknown',
+                role: person.role || 'Unknown',
+                image: person.image,
+                isRegisteredUser: person.isRegisteredUser || false,
+                gameCount: 1,
+                games: [{ _id: game._id, title: game.title, coverImage: game.coverImage }]
+              });
+            } else {
+              const existing = peopleMap.get(key);
+              existing.gameCount++;
+              if (existing.games.length < 3) {
+                existing.games.push({ _id: game._id, title: game.title, coverImage: game.coverImage });
+              }
+            }
+          }
+        });
+      }
+    });
+
+    const results = Array.from(peopleMap.values()).slice(0, limitNum);
+
+    console.log(`🔍 People Search: "${query}" - ${results.length} results found`);
+    
+    res.json({
+      query: query.trim(),
+      results: results,
+      totalFound: results.length,
+      hasMore: results.length === limitNum
+    });
+
+  } catch (err) {
+    console.error("❌ People search error:", err);
+    res.status(500).json({
+      error: "Failed to search people",
+      details: err.message
+    });
+  }
+};

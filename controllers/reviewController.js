@@ -1,5 +1,6 @@
 const Review = require("../models/Review");
 const UserActivity = require("../models/UserActivity");
+const Game = require("../models/Game");
 const mongoose = require("mongoose");
 
 const voteReview = async (req, res) => {
@@ -108,7 +109,7 @@ const addReview = async (req, res) => {
     await newReview.save();
 
     const userActivity = new UserActivity({
-      userId: req.userId || "000000000000000000000000",
+      userId: req.user?.id || req.user?._id,
       activityType: "review",
       gameId,
       targetReviewId: newReview._id,
@@ -126,4 +127,66 @@ const addReview = async (req, res) => {
   }
 };
 
-module.exports = { getReviews, addReview, voteReview, deleteReview };
+// 🆕 Search reviews
+const searchReviews = async (req, res) => {
+  try {
+    const { q: query, limit = 10 } = req.query;
+
+    if (!query || query.trim().length < 2) {
+      return res.status(400).json({ 
+        error: "Search query must be at least 2 characters long" 
+      });
+    }
+
+    const searchRegex = new RegExp(query.trim(), 'i');
+    const limitNum = Math.min(parseInt(limit) || 10, 50);
+
+    // Search reviews by content or author
+    const reviews = await Review.find({
+      $or: [
+        { comment: { $regex: searchRegex } },
+        { authorName: { $regex: searchRegex } }
+      ]
+    })
+    .populate('gameId', 'title coverImage')
+    .populate('authorId', 'username avatar')
+    .sort({ createdAt: -1 })
+    .limit(limitNum)
+    .lean();
+
+    // Format results
+    const formattedResults = reviews.map(review => ({
+      _id: review._id,
+      comment: review.comment ? review.comment.substring(0, 200) + '...' : '',
+      rating: review.rating,
+      authorName: review.authorName || review.authorId?.username || 'Anonymous',
+      authorAvatar: review.authorId?.avatar,
+      game: {
+        _id: review.gameId?._id,
+        title: review.gameId?.title || 'Unknown Game',
+        coverImage: review.gameId?.coverImage
+      },
+      createdAt: review.createdAt,
+      likeCount: review.likedBy?.length || 0,
+      spoiler: review.spoiler
+    }));
+
+    console.log(`🔍 Reviews Search: "${query}" - ${formattedResults.length} results found`);
+    
+    res.json({
+      query: query.trim(),
+      results: formattedResults,
+      totalFound: formattedResults.length,
+      hasMore: formattedResults.length === limitNum
+    });
+
+  } catch (err) {
+    console.error("❌ Reviews search error:", err);
+    res.status(500).json({
+      error: "Failed to search reviews",
+      details: err.message
+    });
+  }
+};
+
+module.exports = { getReviews, addReview, voteReview, deleteReview, searchReviews };

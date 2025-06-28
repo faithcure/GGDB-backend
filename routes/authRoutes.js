@@ -10,8 +10,8 @@ router.post("/check-email", checkEmail);
 router.post("/register", register);
 router.post("/login", login);
 
-// User search endpoint - Contributors için
-router.get("/search-users", authMiddleware, async (req, res) => {
+// User search endpoint - Public search (no auth required)
+router.get("/search-users", async (req, res) => {
     try {
         const { q, limit = 10 } = req.query;
 
