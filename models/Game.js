@@ -77,6 +77,17 @@ const GameSchema = new mongoose.Schema({
 
   ggdbRating: { type: Number, default: 0 },
   ratingCount: { type: Number, default: 0 },
+  
+  // 🆕 Real-time activity counters - Netflix-style dual likes
+  activityStats: {
+    likesCount: { type: Number, default: 0 },      // Single thumbs up
+    lovedCount: { type: Number, default: 0 },      // Double thumbs up (Netflix style)
+    dislikesCount: { type: Number, default: 0 }, 
+    planToPlayCount: { type: Number, default: 0 },
+    playersCount: { type: Number, default: 0 },    // unique users with progress > 0
+    reviewsCount: { type: Number, default: 0 },    // total reviews count
+    lastUpdated: { type: Date, default: Date.now }
+  },
   storeLinks: [
     {
       platform: String,

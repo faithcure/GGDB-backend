@@ -61,7 +61,21 @@ const voteReview = async (req, res) => {
 const deleteReview = async (req, res) => {
   try {
     const { reviewId } = req.params;
+    
+    // Get review first to get gameId
+    const review = await Review.findById(reviewId);
+    if (!review) {
+      return res.status(404).json({ error: "Review not found" });
+    }
+    
+    const gameId = review.gameId;
     await Review.findByIdAndDelete(reviewId);
+    
+    // Update Game model's activity stats for review count
+    const { updateGameStats } = require("../middleware/activityStatsMiddleware");
+    await updateGameStats(gameId, 'review', req.user?.id, false);
+    
+    console.log(`✅ Review deleted for game ${gameId}`);
     res.json({ success: true });
   } catch (err) {
     console.error("❌ Failed to delete review:", err);
@@ -120,9 +134,14 @@ const addReview = async (req, res) => {
 
     await userActivity.save();
 
+    // Update Game model's activity stats for review count
+    const { updateGameStats } = require("../middleware/activityStatsMiddleware");
+    await updateGameStats(gameId, 'review', req.user?.id, true);
+
+    console.log(`✅ Review added for game ${gameId} by ${user}`);
     res.status(201).json(newReview);
   } catch (err) {
-    console.error(err);
+    console.error('❌ Add review error:', err);
     res.status(500).json({ error: "Failed to submit review" });
   }
 };

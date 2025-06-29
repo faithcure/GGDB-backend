@@ -188,7 +188,6 @@ userSchema.pre('save', function(next) {
 
 
 // Index'ler
-userSchema.index({ email: 1 });
 userSchema.index({ username: 1 });
 userSchema.index({ 'platforms.key': 1 });
 userSchema.index({ 'favoriteGenres.key': 1 });

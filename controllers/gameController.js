@@ -135,16 +135,34 @@ const formatContributorForResponse = (contributor) => {
 
 exports.getAllGames = async (req, res) => {
   try {
+    // Import UserActivity model
+    const UserActivity = require("../models/UserActivity");
+    
     const games = await Game.find();
 
-    // 🆕 Format crewList for response
-    const formattedGames = games.map(game => ({
-      ...game.toObject(),
-      crewList: game.crewList.map(formatContributorForResponse)
-    }));
+    // 🆕 Use cached activity stats from Game model instead of real-time counts
+    const formattedGames = games.map((game) => {
+      const gameObj = game.toObject();
+      
+      // Use cached stats from Game.activityStats or fallback to real-time counting
+      const stats = game.activityStats || {};
+      
+      return {
+        ...gameObj,
+        crewList: game.crewList.map(formatContributorForResponse),
+        // Use cached stats for better performance
+        likesCount: stats.likesCount || 0,
+        lovedCount: stats.lovedCount || 0,
+        dislikesCount: stats.dislikesCount || 0,
+        planToPlayCount: stats.planToPlayCount || 0,
+        playersCount: stats.playersCount || 0,
+        reviewsCount: stats.reviewsCount || game.reviews?.length || 0
+      };
+    });
 
     res.json(formattedGames);
   } catch (err) {
+    console.error("getAllGames error:", err);
     res.status(500).json({ error: "Failed to fetch games" });
   }
 };
@@ -175,6 +193,9 @@ exports.addGameReview = async (req, res) => {
   }
 
   try {
+    // Import middleware for updating stats
+    const { updateGameStats } = require("../middleware/activityStatsMiddleware");
+
     const game = await Game.findById(gameId);
     if (!game) return res.status(404).json({ error: "Game not found" });
 
@@ -183,6 +204,10 @@ exports.addGameReview = async (req, res) => {
       user, comment, rating, spoiler, date: new Date()
     });
     await game.save();
+
+    // Update review count in activityStats
+    await updateGameStats(gameId, 'review', null, true);
+
     res.status(201).json({ success: true, reviews: game.reviews });
   } catch (err) {
     console.error("Add review error:", err);

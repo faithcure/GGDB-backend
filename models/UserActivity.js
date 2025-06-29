@@ -9,7 +9,8 @@ const userActivitySchema = new mongoose.Schema({
   activityType: {
     type: String,
     enum: [
-      "like",
+      "like",          // Single thumbs up - regular like
+      "loved",         // Double thumbs up - super like (Netflix style)
       "dislike",
       "progress",
       "plantoplay",

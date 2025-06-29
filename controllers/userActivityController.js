@@ -1,5 +1,6 @@
 const UserActivity = require("../models/UserActivity");
 const Game = require("../models/Game");
+const { updateGameStats, handleOppositeActivity } = require("../middleware/activityStatsMiddleware");
 
 // ===== ENHANCED getUserActivity - Zenginleştirilmiş aktivite getirme =====
 exports.getUserActivity = async (req, res) => {
@@ -103,11 +104,21 @@ exports.toggleLike = async (req, res) => {
     const existing = await UserActivity.findOne(filter);
 
     if (existing) {
+      // Remove like
       await UserActivity.deleteOne({ _id: existing._id });
+      // Update game statistics
+      await updateGameStats(gameId, 'like', userId, false);
       return res.json({ liked: false });
     } else {
-      // Remove conflicting dislike
-      await UserActivity.deleteOne({ userId, gameId, activityType: "dislike" });
+      // Handle opposite activity first
+      await handleOppositeActivity(gameId, userId, 'like');
+      
+      // Remove conflicting activities
+      await UserActivity.deleteMany({ 
+        userId, 
+        gameId, 
+        activityType: { $in: ["dislike", "loved"] } 
+      });
 
       // Fetch game data for caching
       const game = await Game.findById(gameId).select('title coverImage genres platforms').lean();
@@ -122,6 +133,9 @@ exports.toggleLike = async (req, res) => {
         source: 'manual'
       });
 
+      // Update game statistics
+      await updateGameStats(gameId, 'like', userId, true);
+      
       return res.json({ liked: true });
     }
   } catch (err) {
@@ -140,11 +154,21 @@ exports.toggleDislike = async (req, res) => {
     const existing = await UserActivity.findOne(filter);
 
     if (existing) {
+      // Remove dislike
       await UserActivity.deleteOne({ _id: existing._id });
+      // Update game statistics
+      await updateGameStats(gameId, 'dislike', userId, false);
       return res.json({ disliked: false });
     } else {
-      // Remove conflicting like
-      await UserActivity.deleteOne({ userId, gameId, activityType: "like" });
+      // Handle opposite activity first
+      await handleOppositeActivity(gameId, userId, 'dislike');
+      
+      // Remove conflicting activities
+      await UserActivity.deleteMany({ 
+        userId, 
+        gameId, 
+        activityType: { $in: ["like", "loved"] } 
+      });
 
       // Fetch game data for caching
       const game = await Game.findById(gameId).select('title coverImage genres platforms').lean();
@@ -159,11 +183,64 @@ exports.toggleDislike = async (req, res) => {
         source: 'manual'
       });
 
+      // Update game statistics
+      await updateGameStats(gameId, 'dislike', userId, true);
+
       return res.json({ disliked: true });
     }
   } catch (err) {
     console.error('❌ Enhanced toggleDislike error:', err);
     res.status(500).json({ error: "Failed to toggle dislike" });
+  }
+};
+
+// ===== ENHANCED LOVED TOGGLE - Netflix-style double thumbs up =====
+exports.toggleLoved = async (req, res) => {
+  const userId = req.user.id;
+  const { gameId } = req.body;
+
+  try {
+    const filter = { userId, gameId, activityType: "loved" };
+    const existing = await UserActivity.findOne(filter);
+
+    if (existing) {
+      // Remove loved
+      await UserActivity.deleteOne({ _id: existing._id });
+      // Update game statistics
+      await updateGameStats(gameId, 'loved', userId, false);
+      return res.json({ loved: false });
+    } else {
+      // Handle opposite activity first
+      await handleOppositeActivity(gameId, userId, 'loved');
+      
+      // Remove conflicting activities
+      await UserActivity.deleteMany({ 
+        userId, 
+        gameId, 
+        activityType: { $in: ["like", "dislike"] } 
+      });
+
+      // Fetch game data for caching
+      const game = await Game.findById(gameId).select('title coverImage genres platforms').lean();
+
+      // Create new loved activity with cached game data
+      await UserActivity.create({
+        ...filter,
+        gameTitle: game?.title || '',
+        gameCover: game?.coverImage || '',
+        gameGenres: game?.genres || [],
+        gamePlatforms: game?.platforms || [],
+        source: 'manual'
+      });
+
+      // Update game statistics
+      await updateGameStats(gameId, 'loved', userId, true);
+      
+      return res.json({ loved: true });
+    }
+  } catch (err) {
+    console.error('❌ Enhanced toggleLoved error:', err);
+    res.status(500).json({ error: "Failed to toggle loved" });
   }
 };
 
@@ -222,7 +299,10 @@ exports.togglePlanToPlay = async (req, res) => {
     const existing = await UserActivity.findOne(filter);
 
     if (existing) {
+      // Remove plan to play
       await UserActivity.deleteOne({ _id: existing._id });
+      // Update game statistics
+      await updateGameStats(gameId, 'plantoplay', userId, false);
       return res.json({ plantoplay: false });
     } else {
       // Fetch game data for caching
@@ -237,6 +317,9 @@ exports.togglePlanToPlay = async (req, res) => {
         gamePlatforms: game?.platforms || [],
         source: 'manual'
       });
+
+      // Update game statistics
+      await updateGameStats(gameId, 'plantoplay', userId, true);
 
       return res.json({ plantoplay: true });
     }
@@ -275,6 +358,9 @@ exports.addReviewActivity = async (req, res) => {
       difficulty: difficulty || '',
       source: 'manual'
     });
+
+    // Update game statistics
+    await updateGameStats(gameId, 'review', userId, true);
 
     console.log('✅ Review activity created:', reviewActivity._id);
     res.status(201).json(reviewActivity);
@@ -361,6 +447,17 @@ exports.getLikeStatus = async (req, res) => {
   } catch (err) {
     console.error('❌ getLikeStatus error:', err);
     res.status(500).json({ error: "Failed to get like status" });
+  }
+};
+
+exports.getLovedStatus = async (req, res) => {
+  const { userId, gameId } = req.params;
+  try {
+    const loved = await UserActivity.findOne({ userId, gameId, activityType: "loved" });
+    res.json({ loved: !!loved });
+  } catch (err) {
+    console.error('❌ getLovedStatus error:', err);
+    res.status(500).json({ error: "Failed to get loved status" });
   }
 };
 
@@ -464,14 +561,15 @@ exports.getGameStats = async (req, res) => {
   try {
     const { gameId } = req.params;
 
-    const [liked, disliked, plantoplay, completed] = await Promise.all([
+    const [liked, loved, disliked, plantoplay, completed] = await Promise.all([
       UserActivity.countDocuments({ gameId, activityType: "like" }),
+      UserActivity.countDocuments({ gameId, activityType: "loved" }),
       UserActivity.countDocuments({ gameId, activityType: "dislike" }),
       UserActivity.countDocuments({ gameId, activityType: "plantoplay" }),
       UserActivity.countDocuments({ gameId, activityType: "progress", progress: { $gte: 100 } })
     ]);
 
-    res.json({ liked, disliked, plantoplay, completed });
+    res.json({ liked, loved, disliked, plantoplay, completed });
   } catch (err) {
     console.error("❌ getGameStats error:", err);
     res.status(500).json({ error: "Failed to get game stats" });

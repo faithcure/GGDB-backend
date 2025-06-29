@@ -2,8 +2,10 @@ const express = require("express");
 const {
   // ===== ENHANCED EXISTING FUNCTIONS =====
   toggleLike,
+  toggleLoved,
   toggleDislike,
   getLikeStatus,
+  getLovedStatus,
   getDislikeStatus,
   saveProgress,
   getLastProgress,
@@ -32,10 +34,12 @@ const router = express.Router();
 // Supports query params: ?limit=50&type=all&timeRange=all
 router.get("/:userId", authMiddleware, getUserActivity);
 
-// ===== LIKE/DISLIKE ROUTES =====
+// ===== LIKE/LOVED/DISLIKE ROUTES - Netflix style =====
 router.post("/like", authMiddleware, toggleLike);
+router.post("/loved", authMiddleware, toggleLoved);
 router.post("/dislike", authMiddleware, toggleDislike);
 router.get("/like/:userId/:gameId", authMiddleware, getLikeStatus);
+router.get("/loved/:userId/:gameId", authMiddleware, getLovedStatus);
 router.get("/dislike/:userId/:gameId", authMiddleware, getDislikeStatus);
 
 // ===== PROGRESS ROUTES =====
